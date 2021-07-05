@@ -19,3 +19,15 @@ func IsPublicOrBuiltinType(t reflect.Type) bool {
 
 	return IsPublic(t.Name()) || t.PkgPath() == ""
 }
+
+// RefNew 通过refType 构造实例
+func RefNew(refType reflect.Type) interface{} {
+	var refValue reflect.Value
+	if refType.Kind() == reflect.Ptr {
+		refValue = reflect.New(refType.Elem())
+	} else {
+		refValue = reflect.New(refType)
+	}
+
+	return refValue.Interface()
+}

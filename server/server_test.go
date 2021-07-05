@@ -9,7 +9,7 @@ import (
 	"github.com/dollarkillerx/light"
 )
 
-type MethodTest struct {
+type TestMethod struct {
 }
 
 type MethodTestReq struct {
@@ -18,14 +18,14 @@ type MethodTestReq struct {
 type MethodTestResp struct {
 }
 
-func (m *MethodTest) HelloWorld(ctx *light.Context, req *MethodTestReq, resp *MethodTestResp) error {
+func (m *TestMethod) HelloWorld(ctx *light.Context, req *MethodTestReq, resp *MethodTestResp) error {
 	return nil
 }
 
-func TestMethod(t *testing.T) {
+func TestMethodF(t *testing.T) {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
-	mt := &MethodTest{}
+	mt := &TestMethod{}
 
 	mtType := reflect.TypeOf(mt)
 	mtVal := reflect.ValueOf(mt)
@@ -42,4 +42,17 @@ func TestMethod(t *testing.T) {
 	//l1 := &light.Context{}
 	//l2 := &light.Context{}
 	//fmt.Println(reflect.TypeOf(l1).Elem() == reflect.TypeOf(l2).Elem())
+}
+
+func TestManager(t *testing.T) {
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
+
+	mt := &TestMethod{}
+
+	server := NewServer()
+	err := server.Register(mt)
+	if err != nil {
+		log.Fatalln(err)
+		return
+	}
 }

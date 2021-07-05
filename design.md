@@ -120,3 +120,82 @@ func constructionMethods(typ reflect.Type) (map[string]*methodType, error) {
 	return methods, nil
 }
 ```
+构造服务:
+```go
+func newService(server interface{}, serverName string, useName bool) (*service, error) {
+	ser := &service{
+		refVal:  reflect.ValueOf(server),
+		refType: reflect.TypeOf(server),
+	}
+
+	sName := reflect.Indirect(ser.refVal).Type().Name()
+	if !utils.IsPublic(sName) {
+		return nil, pkg.ErrNonPublic
+	}
+
+	if useName {
+		if serverName == "" {
+			return nil, errors.New("Server Name is null")
+		}
+
+		sName = serverName
+	}
+
+	ser.name = sName
+	methods, err := constructionMethods(ser.refType)
+	if err != nil {
+		return nil, err
+	}
+	ser.methodType = methods
+
+	return ser, nil
+}
+```
+调用服务方法
+```go
+// call 方法调用
+func (s *service) call(ctx *light.Context, mType *methodType, request, response reflect.Value) (err error) {
+	// recover 捕获堆栈消息
+	defer func() {
+		if r := recover(); r != nil {
+			buf := make([]byte, 4096)
+			n := runtime.Stack(buf, false)
+			buf = buf[:n]
+
+			err = fmt.Errorf("[painc service internal error]: %v, method: %s, argv: %+v, stack: %s",
+				r, mType.method.Name, request.Interface(), buf)
+			log.Println(err)
+		}
+	}()
+
+	fn := mType.method.Func
+	returnValue := fn.Call([]reflect.Value{s.refVal, reflect.ValueOf(ctx), request, response})
+	errInterface := returnValue[0].Interface()
+	if errInterface != nil {
+		return errInterface.(error)
+	}
+
+	return nil
+}
+```
+
+服务注册到manager
+```go
+func (s *Server) Register(server interface{}) error {
+	return s.register(server, "", false)
+}
+
+func (s *Server) RegisterName(server interface{}, serverName string) error {
+	return s.register(server, serverName, true)
+}
+
+func (s *Server) register(server interface{}, serverName string, useName bool) error {
+	ser, err := newService(server, serverName, useName)
+	if err != nil {
+		return err
+	}
+
+	s.serviceMap[ser.name] = ser
+	return nil
+}
+```

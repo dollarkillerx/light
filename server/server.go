@@ -1,10 +1,10 @@
 package server
 
 import (
-	"errors"
 	"reflect"
 
 	"github.com/dollarkillerx/light"
+	"github.com/dollarkillerx/light/pkg"
 	"github.com/dollarkillerx/light/utils"
 )
 
@@ -26,7 +26,7 @@ func constructionMethods(typ reflect.Type) (map[string]*methodType, error) {
 		mName := method.Name
 
 		if !utils.IsPublic(mName) {
-			return nil, errors.New("Registered non-public service")
+			return nil, pkg.ErrNonPublic
 		}
 
 		// 默认是4个
@@ -65,7 +65,7 @@ func constructionMethods(typ reflect.Type) (map[string]*methodType, error) {
 			continue
 		}
 
-		returnType := mType.Out(1)
+		returnType := mType.Out(0)
 		if returnType != typeOfError {
 			continue
 		}
@@ -78,7 +78,7 @@ func constructionMethods(typ reflect.Type) (map[string]*methodType, error) {
 	}
 
 	if len(methods) == 0 {
-		return nil, errors.New("No service is available, or provide service is not open")
+		return nil, pkg.ErrNoAvailable
 	}
 
 	return methods, nil
