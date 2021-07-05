@@ -1,58 +1,22 @@
-# Design Light RPC
+package server
 
-## 分层抽象
-- 传输层
-- 协议层
-- 服务层
+import (
+	"errors"
+	"reflect"
 
-### 服务端设计
-#### 1. 基础调用
-我们以一个 helloWorld 服务来演示
+	"github.com/dollarkillerx/light"
+	"github.com/dollarkillerx/light/utils"
+)
 
-**1.1 定义服务端**
-```go
-type server struct {}
+var typeOfError = reflect.TypeOf((*error)(nil)).Elem()
+var typeOfContext = reflect.TypeOf((*light.Context)(nil)).Elem()
 
-type HelloWorldRequest struct {
-	Name string
-}
-
-type HelloWorldResponse struct {
-	Msg string
-}
-
-func (s *server) HelloWorld(ctx *light.Context, req *HelloWorldRequest, resp *HelloWorldResponse) error {
-	resp.Msg = fmt.Sprintf("hello world by: %s", req.Name)
-	return nil
-}
-```
-**1.2 服务注册**
-服务管理:
-```go
-type Server struct {
-	serviceMap map[string]*service
-}
-```
-具体每个服务:
-```go
-type service struct {
-	name       string                 // server name
-	refVal     reflect.Value          // server reflect value
-	refType    reflect.Type           // server reflect type
-	methodType map[string]*methodType // server method
-}
-```
-具体每个方法:
-```go
 type methodType struct {
 	method       reflect.Method
 	RequestType  reflect.Type
 	ResponseType reflect.Type
 }
-```
 
-绑定具体方法
-```go
 // constructionMethods Get specific method
 func constructionMethods(typ reflect.Type) (map[string]*methodType, error) {
 	methods := make(map[string]*methodType)
@@ -119,4 +83,3 @@ func constructionMethods(typ reflect.Type) (map[string]*methodType, error) {
 
 	return methods, nil
 }
-```
