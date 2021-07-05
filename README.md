@@ -9,9 +9,9 @@ LightRPC Multi-protocol encryption RPC
 - [ ] HTTP
 
 ### Encoding
-- [ ] JSON
+- [x] JSON
+- [x] MessagePack
 - [ ] Protobuf
-- [ ] MessagePack
 
 ### Discovery
 - [ ] p2p
