@@ -3,7 +3,7 @@ package codes
 import "github.com/vmihailenco/msgpack/v5"
 
 func init() {
-	Manager.register("msg_pack", &MsgPackCode{})
+	Manager.register(CodeMsgPack, &MsgPackCode{})
 }
 
 type MsgPackCode struct{}

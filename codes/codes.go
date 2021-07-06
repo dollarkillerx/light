@@ -1,7 +1,7 @@
 package codes
 
 type manager struct {
-	codes map[string]Code
+	codes map[Type]Code
 }
 
 type Code interface {
@@ -10,14 +10,21 @@ type Code interface {
 }
 
 var Manager = &manager{
-	codes: map[string]Code{},
+	codes: map[Type]Code{},
 }
 
-func (m *manager) register(key string, code Code) {
+func (m *manager) register(key Type, code Code) {
 	m.codes[key] = code
 }
 
-func (m *manager) Get(key string) (Code, bool) {
+func (m *manager) Get(key Type) (Code, bool) {
 	code, ex := m.codes[key]
 	return code, ex
 }
+
+type Type byte
+
+const (
+	CodeJson Type = iota
+	CodeMsgPack
+)

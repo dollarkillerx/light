@@ -3,7 +3,7 @@ package codes
 import "encoding/json"
 
 func init() {
-	Manager.register("json", &JsonCode{})
+	Manager.register(CodeJson, &JsonCode{})
 }
 
 type JsonCode struct{}
