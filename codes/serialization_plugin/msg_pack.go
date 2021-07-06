@@ -1,9 +1,12 @@
-package codes
+package serialization_plugin
 
-import "github.com/vmihailenco/msgpack/v5"
+import (
+	"github.com/dollarkillerx/light/codes"
+	"github.com/vmihailenco/msgpack/v5"
+)
 
 func init() {
-	Manager.register(CodeMsgPack, &MsgPackCode{})
+	codes.SerializationManager.Register(codes.CodeMsgPack, &MsgPackCode{})
 }
 
 type MsgPackCode struct{}

@@ -5,8 +5,8 @@
 - 协议层
 - 服务层
 
-### 服务端设计
-#### 1. 基础调用
+## 服务端设计
+### 基础服务定义 与内部注册
 我们以一个 helloWorld 服务来演示
 
 **1.1 定义服务端**
@@ -199,3 +199,45 @@ func (s *Server) register(server interface{}, serverName string, useName bool) e
 	return nil
 }
 ```
+
+### 1.3编码解码
+codes 目录下创建 序列化工具
+
+实现以下interface
+```go
+type Serialization interface {
+    Encode(i interface{}) ([]byte, error)
+    Decode(data []byte, i interface{}) error
+}
+```
+编写manager进行管理
+```go
+type serializationManager struct {
+    codes map[SerializationType]Serialization
+}
+
+var Manager = &serializationManager{
+    codes: map[SerializationType]Serialization{},
+}
+
+type SerializationType byte
+
+const (
+    CodeJson SerializationType = iota
+    CodeMsgPack
+)
+
+func (m *serializationManager) register(key SerializationType, code Serialization) {
+    m.codes[key] = code
+}
+
+func (m *serializationManager) Get(key SerializationType) (Serialization, bool) {
+    code, ex := m.codes[key]
+    return code, ex
+}
+```
+
+具体实现: 放到 serialization_plugin 下
+
+###  1.4加密解密
+

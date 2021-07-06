@@ -1,9 +1,13 @@
-package codes
+package serialization_plugin
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/dollarkillerx/light/codes"
+)
 
 func init() {
-	Manager.register(CodeJson, &JsonCode{})
+	codes.SerializationManager.Register(codes.CodeJson, &JsonCode{})
 }
 
 type JsonCode struct{}
