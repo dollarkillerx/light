@@ -7,6 +7,14 @@ func init() {
 	serialization_plugin.InitSerialization()
 }
 
+type SerializationType byte
+
+const (
+	Json SerializationType = iota
+	MsgPack
+	Byte
+)
+
 type serializationManager struct {
 	codes map[SerializationType]Serialization
 }
@@ -19,13 +27,6 @@ type Serialization interface {
 var SerializationManager = &serializationManager{
 	codes: map[SerializationType]Serialization{},
 }
-
-type SerializationType byte
-
-const (
-	CodeJson SerializationType = iota
-	CodeMsgPack
-)
 
 func (m *serializationManager) Register(key SerializationType, code Serialization) {
 	m.codes[key] = code

@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	codes.SerializationManager.Register(codes.CodeMsgPack, &MsgPackCode{})
+	codes.SerializationManager.Register(codes.MsgPack, &MsgPackCode{})
 }
 
 type MsgPackCode struct{}

@@ -13,6 +13,11 @@ LightRPC Multi-protocol encryption RPC
 - [x] MessagePack
 - [ ] Protobuf
 
+### Compress
+- [x] RawData
+- [x] Snappy
+- [ ] GZIP
+
 ### Discovery
 - [ ] p2p
 - [ ] etcd

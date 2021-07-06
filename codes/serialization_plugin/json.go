@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	codes.SerializationManager.Register(codes.CodeJson, &JsonCode{})
+	codes.SerializationManager.Register(codes.Json, &JsonCode{})
 }
 
 type JsonCode struct{}

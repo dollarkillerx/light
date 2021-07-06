@@ -239,5 +239,5 @@ func (m *serializationManager) Get(key SerializationType) (Serialization, bool) 
 
 具体实现: 放到 serialization_plugin 下
 
-###  1.4加密解密
-
+###  1.4 compressor 压缩
+基础逻辑同上serialization
