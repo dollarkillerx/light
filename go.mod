@@ -4,6 +4,14 @@ go 1.14
 
 require (
 	github.com/golang/snappy v0.0.4
+	github.com/klauspost/reedsolomon v1.9.12 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rs/xid v1.3.0
+	github.com/templexxx/cpufeat v0.0.0-20180724012125-cef66df7f161 // indirect
+	github.com/templexxx/xor v0.0.0-20191217153810-f85b25db303b // indirect
+	github.com/tjfoc/gmsm v1.4.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.4
+	github.com/xtaci/kcp-go/v5 v5.6.1 // indirect
+	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e // indirect
+	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
 )

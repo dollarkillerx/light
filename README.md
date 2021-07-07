@@ -2,11 +2,11 @@
 LightRPC Multi-protocol encryption RPC
 
 ### Multi-protocol
-- [ ] TCP
-- [ ] KCP
+- [x] TCP
+- [x] KCP
+- [x] HTTP
 - [ ] MQTT
 - [ ] QUIC
-- [ ] HTTP
 
 ### Encoding
 - [x] JSON

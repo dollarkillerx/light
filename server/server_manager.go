@@ -2,12 +2,22 @@ package server
 
 type Server struct {
 	serviceMap map[string]*service
+	options    *Options
 }
 
 func NewServer() *Server {
 	return &Server{
 		serviceMap: map[string]*service{},
+		options:    DefaultOptions(),
 	}
+}
+
+func (s *Server) Run(options ...Option) error {
+	for _, fn := range options {
+		fn(s.options)
+	}
+
+	return nil
 }
 
 func (s *Server) Register(server interface{}) error {
