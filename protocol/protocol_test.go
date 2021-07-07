@@ -40,7 +40,16 @@ func TestProtocol(t *testing.T) {
 	//encode = []byte("a")
 	fmt.Println(encode)
 	fmt.Printf("req: %+v  byt: %+v  json: %+v \n", byte(Request), byte(codes.Byte), byte(codes.Json))
-	message, err := EncodeMessage(serverName, serverPath, byte(Request), byte(codes.Byte), byte(codes.Json), encode)
+
+	metaData := map[string]string{
+		"a": "aa",
+	}
+	bytes, err := js.Encode(metaData)
+	if err != nil {
+		log.Fatalln(err)
+		return
+	}
+	message, err := EncodeMessage(serverName, serverPath, bytes, byte(Request), byte(codes.Byte), byte(codes.Json), encode)
 	if err != nil {
 		log.Fatalln(err)
 		return
