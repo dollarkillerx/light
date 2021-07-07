@@ -2,10 +2,10 @@ package protocol
 
 import (
 	"encoding/binary"
+	"github.com/rs/xid"
 	"hash/crc32"
 
 	"github.com/dollarkillerx/light/pkg"
-	"github.com/rs/xid"
 )
 
 type RequestType byte
@@ -16,7 +16,7 @@ const (
 )
 
 var MaxPayloadMemory = 10 << 20 // 每个请求体最大 10M 超过进行拆分
-var Crc32 bool
+var Crc32 = true
 
 /**
 	协议设计
@@ -39,33 +39,34 @@ type Message struct {
 }
 
 type BaseMessage struct {
-	Total                uint32
-	Offset               uint32
-	MagicNumber          string
-	MagicNumberEndOffset uint32
-	Data                 []byte
+	Total       uint32
+	Offset      uint32
+	MagicNumber string
+	Data        []byte
 }
 
 // BaseDecodeMsg 基础Decode
 func BaseDecodeMsg(data []byte) (*BaseMessage, error) {
 	var result BaseMessage
 
-	c32 := binary.LittleEndian.Uint32(data[4:])
+	c32 := binary.LittleEndian.Uint32(data[:4])
 	if Crc32 {
 		if crc32.ChecksumIEEE(data[4:]) != c32 {
 			return nil, pkg.ErrCrc32
 		}
 	}
-	var magicNumber []byte
+	// [34 247 28 173 $ 1 0 0 0 $ 1 0 0 0 $ 12 0 0 0 $ 96 229 97 155 153 81 68 217 86 52 80 135 $ 1 0 0 0 $ 1 0 0 0 $ 0 2 0 $ 97 $ 97 $ 97]
 
 	result.Total = binary.LittleEndian.Uint32(data[4:8])
 	result.Offset = binary.LittleEndian.Uint32(data[8:12])
-	magicNumberSize := binary.LittleEndian.Uint32(data[8:12])
-	magicEndOffset := 12 + magicNumberSize
-	copy(magicNumber, data[12:magicEndOffset])
+	magicNumberSize := binary.LittleEndian.Uint32(data[12:16])
+
+	magicNumber := make([]byte, magicNumberSize)
+
+	magicEndOffset := 16 + magicNumberSize
+	copy(magicNumber, data[16:magicEndOffset])
 	result.MagicNumber = string(magicNumber)
 	result.Data = data[magicEndOffset:]
-	result.MagicNumberEndOffset = magicEndOffset
 
 	return &result, nil
 }
@@ -73,18 +74,20 @@ func BaseDecodeMsg(data []byte) (*BaseMessage, error) {
 // DecodeMessage 完整Decode
 func DecodeMessage(msg *BaseMessage) (*Message, error) {
 	var result Message
-	serverNameSize := binary.LittleEndian.Uint32(msg.Data[msg.MagicNumberEndOffset:(msg.MagicNumberEndOffset + 4)])
-	serverMethodSize := binary.LittleEndian.Uint32(msg.Data[(msg.MagicNumberEndOffset + 8):(msg.MagicNumberEndOffset + 12)])
-	result.RespType = msg.Data[msg.MagicNumberEndOffset+12]
-	result.CompressorType = msg.Data[msg.MagicNumberEndOffset+13]
-	result.SerializationType = msg.Data[msg.MagicNumberEndOffset+14]
-	var serverName []byte
-	var serverMethod []byte
-	var payload []byte
+	serverNameSize := binary.LittleEndian.Uint32(msg.Data[0:4])
+	serverMethodSize := binary.LittleEndian.Uint32(msg.Data[4:8])
+	result.RespType = msg.Data[8]
+	result.CompressorType = msg.Data[9]
+	result.SerializationType = msg.Data[10]
+	serverName := make([]byte, serverNameSize)
+	serverMethod := make([]byte, serverMethodSize)
+	payload := make([]byte, len(msg.Data)-int(11+serverNameSize+serverMethodSize))
 
-	copy(serverName, msg.Data[(msg.MagicNumberEndOffset+15):(msg.MagicNumberEndOffset+15+serverNameSize)])
-	copy(serverMethod, msg.Data[(msg.MagicNumberEndOffset+15+serverNameSize):(msg.MagicNumberEndOffset+15+serverNameSize+serverMethodSize)])
-	copy(payload, msg.Data[(msg.MagicNumberEndOffset+15+serverNameSize+serverMethodSize):])
+	// [1 0 0 0 $ 1 0 0 0 $ 0 2 0 $ 97 $ 97 $ 97]
+
+	copy(serverName, msg.Data[11:11+serverNameSize])
+	copy(serverMethod, msg.Data[(11+serverNameSize):(11+serverNameSize+serverMethodSize)])
+	copy(payload, msg.Data[(11+serverNameSize+serverMethodSize):])
 
 	result.ServiceName = string(serverName)
 	result.ServiceMethod = string(serverMethod)
@@ -120,8 +123,7 @@ func EncodeMessage(server, method []byte, respType, compressorType, serializatio
 	crc32	:	total	:	offset	: magicNumberSize: magicNumber: serverNameSize : serverMethodSize:  respType : compressorType: serializationType : serverName : serverMethod :  payload
 	4 		:	4 		: 	4 	    :     4          :     xxxx   :       4        :         4        :     1    :        1      :          1        : xxx        :      xxx     :  xxx
 	*/
-	magicNumber := xid.New().Bytes()
-
+	magicNumber := []byte(xid.New().String())
 	// 如果 payload 大小 < MaxPayloadMemory 则不分包  [ 现阶段 不设 包大小限制 ]
 	//if len(payload) <= MaxPayloadMemory {
 	//	// total
@@ -169,7 +171,8 @@ func EncodeMessage(server, method []byte, respType, compressorType, serializatio
 
 	if Crc32 {
 		u := crc32.ChecksumIEEE(buf[4:])
-		binary.LittleEndian.PutUint32(buf[:4], u)
+		binary.LittleEndian.PutUint32(buf[0:4], u)
 	}
+
 	return buf, nil
 }
