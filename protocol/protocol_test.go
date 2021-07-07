@@ -49,6 +49,8 @@ func TestProtocol(t *testing.T) {
 		log.Fatalln(err)
 		return
 	}
+
+	fmt.Println("meta data: ", bytes)
 	message, err := EncodeMessage(serverName, serverPath, bytes, byte(Request), byte(codes.Byte), byte(codes.Json), encode)
 	if err != nil {
 		log.Fatalln(err)

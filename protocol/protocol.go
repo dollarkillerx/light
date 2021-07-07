@@ -113,13 +113,13 @@ func BaseEncodeMessage(server, method, metaData []byte, respType, compressorType
 	binary.LittleEndian.PutUint32(buf[4:8], uint32(len(method)))
 	binary.LittleEndian.PutUint32(buf[4:8], uint32(len(method)))
 	binary.LittleEndian.PutUint32(buf[8:12], uint32(len(metaData)))
-	buf[8] = respType
-	buf[9] = compressorType
-	buf[10] = serializationType
-	copy(buf[11:11+len(metaData)], metaData)
-	copy(buf[11+len(metaData):11+len(metaData)+len(server)], server)
-	copy(buf[11+len(metaData)+len(server):11+len(metaData)+len(server)+len(method)], method)
-	copy(buf[11+len(metaData)+len(server)+len(method):], payload)
+	buf[12] = respType
+	buf[13] = compressorType
+	buf[14] = serializationType
+	copy(buf[15:15+len(metaData)], metaData)
+	copy(buf[15+len(metaData):15+len(metaData)+len(server)], server)
+	copy(buf[15+len(metaData)+len(server):15+len(metaData)+len(server)+len(method)], method)
+	copy(buf[15+len(metaData)+len(server)+len(method):], payload)
 
 	return buf, nil
 }
