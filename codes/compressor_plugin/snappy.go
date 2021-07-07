@@ -4,13 +4,8 @@ import (
 	"bytes"
 	"io/ioutil"
 
-	"github.com/dollarkillerx/light/codes"
 	"github.com/golang/snappy"
 )
-
-func init() {
-	codes.CompressorManager.Register(codes.Snappy, &Snappy{})
-}
 
 type Snappy struct{}
 

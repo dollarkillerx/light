@@ -2,13 +2,7 @@ package serialization_plugin
 
 import (
 	"encoding/json"
-
-	"github.com/dollarkillerx/light/codes"
 )
-
-func init() {
-	codes.SerializationManager.Register(codes.Json, &JsonCode{})
-}
 
 type JsonCode struct{}
 

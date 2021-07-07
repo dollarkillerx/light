@@ -4,7 +4,9 @@ import "github.com/dollarkillerx/light/codes/serialization_plugin"
 
 func init() {
 	// 初始化所有插件
-	serialization_plugin.InitSerialization()
+	SerializationManager.Register(Json, &serialization_plugin.JsonCode{})
+	SerializationManager.Register(MsgPack, &serialization_plugin.MsgPackCode{})
+	SerializationManager.Register(Byte, &serialization_plugin.ByteCode{})
 }
 
 type SerializationType byte

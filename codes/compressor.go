@@ -1,5 +1,15 @@
 package codes
 
+import (
+	"github.com/dollarkillerx/light/codes/compressor_plugin"
+)
+
+func init() {
+	// 初始化所有插件
+	CompressorManager.Register(RawData, &compressor_plugin.RawData{})
+	CompressorManager.Register(Snappy, &compressor_plugin.Snappy{})
+}
+
 type CompressorType byte
 
 const (

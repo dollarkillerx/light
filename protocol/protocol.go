@@ -8,6 +8,13 @@ import (
 	"github.com/rs/xid"
 )
 
+type RequestType byte
+
+const (
+	Request RequestType = iota
+	Response
+)
+
 var MaxPayloadMemory = 10 << 20 // 每个请求体最大 10M 超过进行拆分
 var Crc32 bool
 

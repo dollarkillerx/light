@@ -241,3 +241,12 @@ func (m *serializationManager) Get(key SerializationType) (Serialization, bool) 
 
 ###  1.4 compressor 压缩
 基础逻辑同上serialization
+
+### 1.5 协议设计
+``` 
+	/**
+	crc32	:	total	:	offset	: magicNumberSize: magicNumber: serverNameSize : serverMethodSize:  respType : compressorType: serializationType : serverName : serverMethod :  payload
+	4 		:	4 		: 	4 	    :     4          :     xxxx   :       4        :         4        :     1    :        1      :          1        : xxx        :      xxx     :  xxx
+	*/
+```
+具体编码解码: protocol/protocaol.go

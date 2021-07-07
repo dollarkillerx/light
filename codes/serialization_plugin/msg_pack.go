@@ -1,13 +1,8 @@
 package serialization_plugin
 
 import (
-	"github.com/dollarkillerx/light/codes"
 	"github.com/vmihailenco/msgpack/v5"
 )
-
-func init() {
-	codes.SerializationManager.Register(codes.MsgPack, &MsgPackCode{})
-}
 
 type MsgPackCode struct{}
 

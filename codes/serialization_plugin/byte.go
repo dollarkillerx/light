@@ -3,13 +3,7 @@ package serialization_plugin
 import (
 	"fmt"
 	"reflect"
-
-	"github.com/dollarkillerx/light/codes"
 )
-
-func init() {
-	codes.SerializationManager.Register(codes.Byte, &ByteCode{})
-}
 
 type ByteCode struct{}
 
