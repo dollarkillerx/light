@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"io"
 
 	"github.com/rs/xid"
 )
@@ -60,6 +61,51 @@ type Header struct {
 	SerializationType byte
 }
 
+type Protocol struct{}
+
+func NewProtocol() *Protocol {
+	return &Protocol{}
+}
+
+func (m *Protocol) IODecode(r io.Reader) (*Message, error) {
+	headerByte := make([]byte, HeadSize)
+	// 读取标志位
+	_, err := io.ReadFull(r, headerByte[:1])
+	if err != nil {
+		return nil, err
+	}
+
+	if headerByte[0] != LightSt {
+		return nil, errors.New("NO Light")
+	}
+
+	// 读取剩下的
+	_, err = io.ReadFull(r, headerByte[1:])
+	if err != nil {
+		return nil, err
+	}
+
+	// 解析 header
+	header, err := DecodeHeader(headerByte)
+	if err != nil {
+		return nil, err
+	}
+
+	bodyLen := header.MagicNumberSize + header.ServerNameSize + header.ServerMethodSize + header.MetaDataSize + header.PayloadSize
+	bodyData := make([]byte, bodyLen)
+	_, err = io.ReadFull(r, bodyData)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := DecodeMessageV2(bodyData, header, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return msg, nil
+}
+
 func DecodeHeader(data []byte) (*Header, error) {
 	var header Header
 	header.St = data[0]
@@ -85,14 +131,16 @@ func DecodeHeader(data []byte) (*Header, error) {
 
 // DecodeMessage 完整Decode
 func DecodeMessage(data []byte) (*Message, error) {
-	var result Message
 	header, err := DecodeHeader(data)
 	if err != nil {
 		return nil, err
 	}
-	result.Header = header
+	return DecodeMessageV2(data, header, HeadSize)
+}
 
-	var st uint32 = HeadSize
+func DecodeMessageV2(data []byte, header *Header, headSize uint32) (*Message, error) {
+	var result Message
+	var st uint32 = headSize
 	endI := st + header.MagicNumberSize
 	les := endI - st
 	magicNumber := make([]byte, les)

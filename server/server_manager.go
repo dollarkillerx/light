@@ -75,8 +75,7 @@ loop:
 				continue
 			}
 
-			accept = accept
-			//accept.Read()
+			go s.process(accept)
 		}
 
 	}

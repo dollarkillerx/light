@@ -12,9 +12,11 @@ type Options struct {
 	Uri      string
 	nl       net.Listener
 	ctx      context.Context
+	options  map[string]interface{} // 零散配置
 
-	readTimeout  time.Duration
-	writeTimeout time.Duration
+	readTimeout     time.Duration
+	writeTimeout    time.Duration
+	processChanSize int
 }
 
 type Protocol string
@@ -37,6 +39,10 @@ func DefaultOptions() *Options {
 		readTimeout:  time.Second * 30,
 		writeTimeout: time.Second * 30,
 		ctx:          context.Background(),
+		options: map[string]interface{}{
+			"TCPKeepAlivePeriod": time.Minute * 3,
+		},
+		processChanSize: 1000,
 	}
 }
 

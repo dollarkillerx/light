@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/golang/snappy v0.0.4
 	github.com/klauspost/reedsolomon v1.9.12 // indirect
+	github.com/panjf2000/ants/v2 v2.4.6 // indirect
 	github.com/rs/xid v1.3.0
 	github.com/tjfoc/gmsm v1.4.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.4
