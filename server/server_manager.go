@@ -16,7 +16,7 @@ type Server struct {
 func NewServer() *Server {
 	return &Server{
 		serviceMap: map[string]*service{},
-		options:    DefaultOptions(),
+		options:    defaultOptions(),
 	}
 }
 

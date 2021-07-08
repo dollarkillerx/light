@@ -31,7 +31,7 @@ func (p Protocol) String() string {
 	return string(p)
 }
 
-func DefaultOptions() *Options {
+func defaultOptions() *Options {
 	return &Options{
 		Protocol:     KCP, // default KCP
 		Uri:          "0.0.0.0:8397",
