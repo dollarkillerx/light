@@ -75,7 +75,8 @@ loop:
 				continue
 			}
 
-			accept.Read()
+			accept = accept
+			//accept.Read()
 		}
 
 	}

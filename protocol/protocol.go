@@ -2,10 +2,11 @@ package protocol
 
 import (
 	"encoding/binary"
-	"github.com/rs/xid"
+	"errors"
+	"fmt"
 	"hash/crc32"
 
-	"github.com/dollarkillerx/light/pkg"
+	"github.com/rs/xid"
 )
 
 type RequestType byte
@@ -15,20 +16,26 @@ const (
 	Response
 )
 
-var MaxPayloadMemory = 10 << 20 // 每个请求体最大 10M 超过进行拆分
-var Crc32 = true
+//var MaxPayloadMemory = 10 << 20 // 每个请求体最大 10M 超过进行拆分
+var Crc32 = false
+
+type LightVersion byte
+
+const (
+	V1 LightVersion = iota
+)
+
+const LightSt = 0x05 // 起始符
+const HeadSize = 29
 
 /**
 	协议设计
-	// 每个请求体最大 10M 超过进行拆分
-	// crc32校验, 当前消息总数,  当前消息offset , key大小, 当前请求ID (github.com/rs/xid go客户端使用xid生成), 请求体
-	crc32	:	total	:	offset	: magicNumberSize: magicNumber: serverNameSize : serverMethodSize:  metaDataSize: respType : compressorType: serializationType : metaDataValue : serverName : serverMethod :  payload
-    4 		:	4 		: 	4 	    :     4          :     xxxx   :       4        :         4        :     4       :    1    :        1      :          1         :      xxx      :      xxx   :      xxx     :   xxxx
+	起始符 :  版本号 :  crc32校验 :   magicNumberSize:    serverNameSize :   serverMethodSize :  metaDataSize : payloadSize:  respType :   compressorType :    serializationType :    magicNumber :  serverName :   serverMethod :  metaData :  payload
+    0x05  :  0x01  :     4     :        4         :         4         :         4          :       4       :      4     :      1    :          1       :           1          :        xxx     :       xxx   :        xxx     :    xxx    :    xxx
 */
 
 type Message struct {
-	Total             uint32
-	Offset            uint32
+	Header            *Header
 	MagicNumber       string
 	RespType          byte
 	CompressorType    byte
@@ -39,121 +46,132 @@ type Message struct {
 	Payload           []byte
 }
 
-type BaseMessage struct {
-	Total       uint32
-	Offset      uint32
-	MagicNumber string
-	Data        []byte
+type Header struct {
+	St                byte
+	Version           byte
+	Crc32             uint32
+	MagicNumberSize   uint32
+	ServerNameSize    uint32
+	ServerMethodSize  uint32
+	MetaDataSize      uint32
+	PayloadSize       uint32
+	RespType          byte
+	CompressorType    byte
+	SerializationType byte
 }
 
-// BaseDecodeMsg 基础Decode
-func BaseDecodeMsg(data []byte) (*BaseMessage, error) {
-	var result BaseMessage
-
-	c32 := binary.LittleEndian.Uint32(data[:4])
+func DecodeHeader(data []byte) (*Header, error) {
+	var header Header
+	header.St = data[0]
+	header.Version = data[1]
+	header.Crc32 = binary.LittleEndian.Uint32(data[2:6])
 	if Crc32 {
-		if crc32.ChecksumIEEE(data[4:]) != c32 {
-			return nil, pkg.ErrCrc32
+		u := crc32.ChecksumIEEE(data[6:])
+		if header.Crc32 != u {
+			return nil, errors.New("CRC Calibration")
 		}
 	}
-	// [34 247 28 173 $ 1 0 0 0 $ 1 0 0 0 $ 12 0 0 0 $ 96 229 97 155 153 81 68 217 86 52 80 135 $ 1 0 0 0 $ 1 0 0 0 $ 0 2 0 $ 97 $ 97 $ 97]
+	header.MagicNumberSize = binary.LittleEndian.Uint32(data[6:10])
+	header.ServerNameSize = binary.LittleEndian.Uint32(data[10:14])
+	header.ServerMethodSize = binary.LittleEndian.Uint32(data[14:18])
+	header.MetaDataSize = binary.LittleEndian.Uint32(data[18:22])
+	header.PayloadSize = binary.LittleEndian.Uint32(data[22:26])
+	header.RespType = data[26]
+	header.CompressorType = data[27]
+	header.SerializationType = data[28]
 
-	result.Total = binary.LittleEndian.Uint32(data[4:8])
-	result.Offset = binary.LittleEndian.Uint32(data[8:12])
-	magicNumberSize := binary.LittleEndian.Uint32(data[12:16])
-
-	magicNumber := make([]byte, magicNumberSize)
-
-	magicEndOffset := 16 + magicNumberSize
-	copy(magicNumber, data[16:magicEndOffset])
-	result.MagicNumber = string(magicNumber)
-	result.Data = data[magicEndOffset:]
-
-	return &result, nil
+	return &header, nil
 }
 
 // DecodeMessage 完整Decode
-func DecodeMessage(msg *BaseMessage) (*Message, error) {
+func DecodeMessage(data []byte) (*Message, error) {
 	var result Message
-	serverNameSize := binary.LittleEndian.Uint32(msg.Data[0:4])
-	serverMethodSize := binary.LittleEndian.Uint32(msg.Data[4:8])
-	metaDataSize := binary.LittleEndian.Uint32(msg.Data[8:12])
-	result.RespType = msg.Data[12]
-	result.CompressorType = msg.Data[13]
-	result.SerializationType = msg.Data[14]
-	serverName := make([]byte, serverNameSize)
-	serverMethod := make([]byte, serverMethodSize)
-	metaData := make([]byte, metaDataSize)
-	payload := make([]byte, len(msg.Data)-int(15+serverNameSize+serverMethodSize+metaDataSize))
+	header, err := DecodeHeader(data)
+	if err != nil {
+		return nil, err
+	}
+	result.Header = header
 
-	// [1 0 0 0 $ 1 0 0 0 $ 0 2 0 $ 97 $ 97 $ 97]
-	copy(metaData, msg.Data[15:15+metaDataSize])
-	copy(serverName, msg.Data[15+metaDataSize:15+metaDataSize+serverNameSize])
-	copy(serverMethod, msg.Data[(15+metaDataSize+serverNameSize):(15+metaDataSize+serverNameSize+serverMethodSize)])
-	copy(payload, msg.Data[(15+metaDataSize+serverNameSize+serverMethodSize):])
+	var st uint32 = HeadSize
+	endI := st + header.MagicNumberSize
+	les := endI - st
+	magicNumber := make([]byte, les)
+	copy(magicNumber, data[st:endI])
+	result.MagicNumber = string(magicNumber)
 
+	st = endI
+	endI = st + header.ServerNameSize
+	les = endI - st
+	serverName := make([]byte, les)
+	copy(serverName, data[st:endI])
 	result.ServiceName = string(serverName)
-	result.ServiceMethod = string(serverMethod)
-	result.Payload = payload
-	result.MetaData = metaData
+
+	st = endI
+	endI = st + header.ServerMethodSize
+	les = endI - st
+	serverMethodSize := make([]byte, les)
+	copy(serverMethodSize, data[st:endI])
+	result.ServiceMethod = string(serverMethodSize)
+
+	st = endI
+	endI = st + header.MetaDataSize
+	les = endI - st
+	metaDataSize := make([]byte, les)
+	copy(metaDataSize, data[st:endI])
+	result.MetaData = metaDataSize
+
+	st = endI
+	endI = st + header.PayloadSize
+	les = endI - st
+	payloadSize := make([]byte, les)
+	copy(payloadSize, data[st:endI])
+	result.Payload = payloadSize
 
 	return &result, nil
-}
-
-// BaseEncodeMessage 基础编码
-func BaseEncodeMessage(server, method, metaData []byte, respType, compressorType, serializationType byte, payload []byte) ([]byte, error) {
-	/**
-	  	 serverNameSize : serverMethodSize:  metaDataSize : respType : compressorType: serializationType:  metaDataVal : serverName : serverMethod :  payload
-	           4        :         4       :     4         :    1     :        1      :          1       :    xxx       : xxx        :      xxx     :  xxx
-	*/
-	bufSize := 15 + len(server) + len(method) + len(metaData) + len(payload)
-	buf := make([]byte, bufSize)
-
-	binary.LittleEndian.PutUint32(buf[0:4], uint32(len(server)))
-	binary.LittleEndian.PutUint32(buf[4:8], uint32(len(method)))
-	binary.LittleEndian.PutUint32(buf[4:8], uint32(len(method)))
-	binary.LittleEndian.PutUint32(buf[8:12], uint32(len(metaData)))
-	buf[12] = respType
-	buf[13] = compressorType
-	buf[14] = serializationType
-	copy(buf[15:15+len(metaData)], metaData)
-	copy(buf[15+len(metaData):15+len(metaData)+len(server)], server)
-	copy(buf[15+len(metaData)+len(server):15+len(metaData)+len(server)+len(method)], method)
-	copy(buf[15+len(metaData)+len(server)+len(method):], payload)
-
-	return buf, nil
 }
 
 // EncodeMessage 基础编码
 func EncodeMessage(server, method, metaData []byte, respType, compressorType, serializationType byte, payload []byte) ([]byte, error) {
-	/**
-	crc32	:	total	:	offset	: magicNumberSize: magicNumber: serverNameSize : serverMethodSize:  metaDataSize: respType : compressorType: serializationType : metaDataValue : serverName : serverMethod :  payload
-	4 		:	4 		: 	4 	    :     4          :     xxxx   :       4        :         4        :     4       :    1    :        1      :          1         :      xxx      :      xxx   :      xxx     :   xxxx
-	*/
 	magicNumber := []byte(xid.New().String())
-	// 如果 payload 大小 < MaxPayloadMemory 则不分包  [ 现阶段 不设 包大小限制 ]
-	//if len(payload) <= MaxPayloadMemory {
 
-	var total uint32 = 1
-	var offset uint32 = 1
-	bufSize := 16 + len(magicNumber)
+	bufSize := HeadSize + len(server) + len(method) + len(metaData) + len(payload) + len(magicNumber)
 	buf := make([]byte, bufSize)
-	// 直接分装 不 分页
-	message, err := BaseEncodeMessage(server, method, metaData, respType, compressorType, serializationType, payload)
-	if err != nil {
-		return nil, err
-	}
 
-	buf = append(buf, message...)
+	buf[0] = LightSt
+	buf[1] = byte(V1)
+	binary.LittleEndian.PutUint32(buf[6:10], uint32(len(magicNumber)))
+	binary.LittleEndian.PutUint32(buf[10:14], uint32(len(server)))
+	binary.LittleEndian.PutUint32(buf[14:18], uint32(len(method)))
+	binary.LittleEndian.PutUint32(buf[18:22], uint32(len(metaData)))
+	binary.LittleEndian.PutUint32(buf[22:26], uint32(len(payload)))
+	buf[26] = respType
+	buf[27] = compressorType
+	buf[28] = serializationType
 
-	binary.LittleEndian.PutUint32(buf[4:8], total)
-	binary.LittleEndian.PutUint32(buf[8:12], offset)
-	binary.LittleEndian.PutUint32(buf[12:16], uint32(len(magicNumber)))
-	copy(buf[16:16+len(magicNumber)], magicNumber)
+	st := HeadSize
+	endI := st + len(magicNumber)
+	copy(buf[st:endI], magicNumber)
+
+	st = endI
+	endI = st + len(server)
+	copy(buf[st:endI], server)
+
+	st = endI
+	endI = st + len(method)
+	copy(buf[st:endI], method)
+
+	st = endI
+	endI = st + len(metaData)
+	copy(buf[st:endI], metaData)
+
+	st = endI
+	endI = st + len(payload)
+	fmt.Println(bufSize)
+	copy(buf[st:endI], payload)
 
 	if Crc32 {
-		u := crc32.ChecksumIEEE(buf[4:])
-		binary.LittleEndian.PutUint32(buf[0:4], u)
+		u := crc32.ChecksumIEEE(buf[6:])
+		binary.LittleEndian.PutUint32(buf[2:6], u)
 	}
 
 	return buf, nil
