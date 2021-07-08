@@ -1,5 +1,13 @@
 package server
 
+import (
+	"errors"
+	"fmt"
+	"log"
+
+	"github.com/dollarkillerx/light/transport"
+)
+
 type Server struct {
 	serviceMap map[string]*service
 	options    *Options
@@ -10,14 +18,6 @@ func NewServer() *Server {
 		serviceMap: map[string]*service{},
 		options:    DefaultOptions(),
 	}
-}
-
-func (s *Server) Run(options ...Option) error {
-	for _, fn := range options {
-		fn(s.options)
-	}
-
-	return nil
 }
 
 func (s *Server) Register(server interface{}) error {
@@ -35,5 +35,50 @@ func (s *Server) register(server interface{}, serverName string, useName bool) e
 	}
 
 	s.serviceMap[ser.name] = ser
+	return nil
+}
+
+func (s *Server) Run(options ...Option) error {
+	for _, fn := range options {
+		fn(s.options)
+	}
+
+	var err error
+	switch s.options.Protocol {
+	case KCP:
+		s.options.nl, err = transport.Transport.Gen(KCP.String(), s.options.Uri)
+		if err != nil {
+			return err
+		}
+	case TCP:
+		s.options.nl, err = transport.Transport.Gen(KCP.String(), s.options.Uri)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New(fmt.Sprintf("%s not funod", s.options.Protocol))
+	}
+
+	return s.run()
+}
+
+func (s *Server) run() error {
+loop:
+	for {
+		select {
+		case <-s.options.ctx.Done():
+			break loop
+		default:
+			accept, err := s.options.nl.Accept()
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+
+			accept.Read()
+		}
+
+	}
+
 	return nil
 }

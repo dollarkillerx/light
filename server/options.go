@@ -1,29 +1,42 @@
 package server
 
-import "time"
+import (
+	"context"
+	"net"
+	"time"
+)
 
 type Options struct {
 	Protocol Protocol
 	UseHttp  bool
+	Uri      string
+	nl       net.Listener
+	ctx      context.Context
 
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 }
 
-type Protocol int
+type Protocol string
 
 const (
-	TCP Protocol = iota
-	KCP
-	MQTT
+	TCP  Protocol = "tcp"
+	KCP  Protocol = "kcp"
+	MQTT Protocol = "mqtt"
 )
+
+func (p Protocol) String() string {
+	return string(p)
+}
 
 func DefaultOptions() *Options {
 	return &Options{
 		Protocol:     KCP, // default KCP
+		Uri:          "0.0.0.0:8397",
 		UseHttp:      false,
 		readTimeout:  time.Second * 30,
 		writeTimeout: time.Second * 30,
+		ctx:          context.Background(),
 	}
 }
 
@@ -31,18 +44,21 @@ type Option func(options *Options)
 
 func UseTCP(host string) Option {
 	return func(options *Options) {
+		options.Uri = host
 		options.Protocol = TCP
 	}
 }
 
 func UseKCP(host string) Option {
 	return func(options *Options) {
+		options.Uri = host
 		options.Protocol = KCP
 	}
 }
 
 func UseMQTT(host string) Option {
 	return func(options *Options) {
+		options.Uri = host
 		options.Protocol = MQTT
 	}
 }
@@ -58,5 +74,11 @@ func SetTimeout(readTimeout time.Duration, writeTimeout time.Duration) Option {
 	return func(options *Options) {
 		options.readTimeout = readTimeout
 		options.writeTimeout = writeTimeout
+	}
+}
+
+func SetContext(ctx context.Context) Option {
+	return func(options *Options) {
+		options.ctx = ctx
 	}
 }
