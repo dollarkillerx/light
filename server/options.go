@@ -4,10 +4,12 @@ import (
 	"context"
 	"net"
 	"time"
+
+	"github.com/dollarkillerx/light/transport"
 )
 
 type Options struct {
-	Protocol Protocol
+	Protocol transport.Protocol
 	UseHttp  bool
 	Uri      string
 	nl       net.Listener
@@ -19,21 +21,9 @@ type Options struct {
 	processChanSize int
 }
 
-type Protocol string
-
-const (
-	TCP  Protocol = "tcp"
-	KCP  Protocol = "kcp"
-	MQTT Protocol = "mqtt"
-)
-
-func (p Protocol) String() string {
-	return string(p)
-}
-
 func defaultOptions() *Options {
 	return &Options{
-		Protocol:     KCP, // default KCP
+		Protocol:     transport.KCP, // default KCP
 		Uri:          "0.0.0.0:8397",
 		UseHttp:      false,
 		readTimeout:  time.Second * 30,
@@ -51,27 +41,27 @@ type Option func(options *Options)
 func UseTCP(host string) Option {
 	return func(options *Options) {
 		options.Uri = host
-		options.Protocol = TCP
+		options.Protocol = transport.TCP
 	}
 }
 
 func UseKCP(host string) Option {
 	return func(options *Options) {
 		options.Uri = host
-		options.Protocol = KCP
+		options.Protocol = transport.KCP
 	}
 }
 
 func UseMQTT(host string) Option {
 	return func(options *Options) {
 		options.Uri = host
-		options.Protocol = MQTT
+		options.Protocol = transport.MQTT
 	}
 }
 
 func UseHTTP() Option {
 	return func(options *Options) {
-		options.Protocol = TCP
+		options.Protocol = transport.TCP
 		options.UseHttp = true
 	}
 }

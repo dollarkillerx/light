@@ -7,9 +7,14 @@ import (
 )
 
 func init() {
-	Transport.register("kcp", kcpNet)
+	Transport.register(KCP, kcpNet)
+	Client.register(KCP, kcpNetClient)
 }
 
 func kcpNet(addr string) (net.Listener, error) {
 	return kcp.Listen(addr)
+}
+
+func kcpNetClient(addr string) (net.Conn, error) {
+	return kcp.Dial(addr)
 }
