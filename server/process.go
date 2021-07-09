@@ -165,9 +165,7 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 	}
 
 	ctx := light.DefaultCtx()
-	for k, v := range metaData {
-		ctx.SetValue(k, v)
-	}
+	ctx.SetMetaData(metaData)
 
 	ser, ex := s.serviceMap[msg.ServiceName]
 	if !ex {
@@ -189,18 +187,14 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 		return
 	}
 
-	var respBody []byte
 	callErr := ser.call(ctx, method, reflect.ValueOf(req), reflect.ValueOf(resp))
 	if callErr != nil {
-		respBody, _ = serialization.Encode(callErr)
-	} else {
-		var err2 error
-		respBody, err2 = serialization.Encode(resp)
-		if err2 != nil {
-			respBody, _ = serialization.Encode(err2)
-		}
+		ctx.SetValue("RespError", callErr.Error())
 	}
 	// 1. 序列化
+	var respBody []byte
+	respBody, err = serialization.Encode(resp)
+
 	var metaDataByte []byte
 	metaDataByte, _ = serialization.Encode(ctx.GetMetaData())
 	// 2. 加密

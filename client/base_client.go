@@ -1,8 +1,7 @@
 package client
 
 import (
-	"encoding/json"
-	"fmt"
+	"errors"
 	"log"
 	"net"
 	"time"
@@ -107,21 +106,47 @@ func (b *BaseClient) Call(ctx *light.Context, serviceMethod string, request inte
 		return err
 	}
 
-	fmt.Println("read ...")
 	// 3.封装回执
 	now := time.Now()
 	b.conn.SetReadDeadline(now.Add(b.options.readTimeout))
 
 	proto := protocol.NewProtocol()
-	decode, err := proto.IODecode(b.conn)
-	if err != nil {
-		return err
-	}
-	marshal, err := json.Marshal(decode)
+	msg, err := proto.IODecode(b.conn)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(string(marshal))
-	return nil
+	// 1. 解压缩
+	msg.MetaData, err = b.compressor.Unzip(msg.MetaData)
+	if err != nil {
+		return err
+	}
+	msg.Payload, err = b.compressor.Unzip(msg.Payload)
+	if err != nil {
+		return err
+	}
+	// 2. 解密
+	msg.MetaData, err = cryptology.AESDecrypt(b.options.aesKey, msg.MetaData)
+	if err != nil {
+		return err
+	}
+
+	msg.Payload, err = cryptology.AESDecrypt(b.options.aesKey, msg.Payload)
+	if err != nil {
+		return err
+	}
+	// 3. 反序列化 RespError
+	mtData := make(map[string]string)
+	err = b.serialization.Decode(msg.MetaData, &mtData)
+	if err != nil {
+		return err
+	}
+	ctx.SetMetaData(mtData)
+
+	value := ctx.Value("RespError")
+	if value != "" {
+		return errors.New(value)
+	}
+
+	return b.serialization.Decode(msg.Payload, response)
 }

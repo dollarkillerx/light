@@ -35,3 +35,7 @@ func (c *Context) SetValue(key, val string) {
 func (c *Context) GetMetaData() map[string]string {
 	return c.metaData
 }
+
+func (c *Context) SetMetaData(r map[string]string) {
+	c.metaData = r
+}

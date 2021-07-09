@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"reflect"
@@ -22,7 +23,7 @@ type MethodTestResp struct {
 
 func (m *TestMethod) HelloWorld(ctx *light.Context, req *MethodTestReq, resp *MethodTestResp) error {
 	resp.RPName = fmt.Sprintf("hello: %s", req.Name)
-	return nil
+	return errors.New("what ?")
 }
 
 func TestServer(t *testing.T) {
