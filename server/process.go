@@ -53,14 +53,14 @@ loop:
 				break loop
 			}
 			now := time.Now()
-			if s.options.writeTimeout != 0 {
+			if s.options.writeTimeout > 0 {
 				conn.SetWriteDeadline(now.Add(s.options.writeTimeout))
 			}
 			// send message
 			msg = msg
 		default:
 			now := time.Now()
-			if s.options.readTimeout != 0 {
+			if s.options.readTimeout > 0 {
 				conn.SetReadDeadline(now.Add(s.options.readTimeout))
 			}
 

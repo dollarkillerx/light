@@ -10,4 +10,7 @@ func TestIsPublic(t *testing.T) {
 	fmt.Println(IsPublic(r))
 	r = "name"
 	fmt.Println(IsPublic(r))
+
+	rc := map[string]string{}
+	fmt.Println(rc["jex"])
 }

@@ -40,7 +40,11 @@ func (c *connectPool) initPool() error {
 			return err
 		}
 
-		c.pool <- newBaseClient(con)
+		client, err := newBaseClient(c.connect.serverName, con, c.connect.Client.options)
+		if err != nil {
+			return err
+		}
+		c.pool <- client
 	}
 
 	return nil

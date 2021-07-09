@@ -19,7 +19,7 @@ LightRPC Multi-protocol encryption RPC
 - [ ] GZIP
 
 ### Discovery
-- [ ] p2p
+- [x] p2p
 - [ ] etcd
 - [ ] consul
 

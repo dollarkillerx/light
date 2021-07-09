@@ -46,12 +46,12 @@ func (s *Server) Run(options ...Option) error {
 	var err error
 	switch s.options.Protocol {
 	case transport.KCP:
-		s.options.nl, err = transport.Transport.Gen(transport.KCP.String(), s.options.Uri)
+		s.options.nl, err = transport.Transport.Gen(transport.KCP, s.options.Uri)
 		if err != nil {
 			return err
 		}
 	case transport.TCP:
-		s.options.nl, err = transport.Transport.Gen(transport.KCP.String(), s.options.Uri)
+		s.options.nl, err = transport.Transport.Gen(transport.KCP, s.options.Uri)
 		if err != nil {
 			return err
 		}
