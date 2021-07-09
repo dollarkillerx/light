@@ -51,7 +51,7 @@ func (s *Server) Run(options ...Option) error {
 			return err
 		}
 	case transport.TCP:
-		s.options.nl, err = transport.Transport.Gen(transport.KCP, s.options.Uri)
+		s.options.nl, err = transport.Transport.Gen(transport.TCP, s.options.Uri)
 		if err != nil {
 			return err
 		}
@@ -59,6 +59,7 @@ func (s *Server) Run(options ...Option) error {
 		return errors.New(fmt.Sprintf("%s not funod", s.options.Protocol))
 	}
 
+	log.Printf("LightRPC: %s  %s \n", s.options.Protocol, s.options.Uri)
 	return s.run()
 }
 
@@ -74,7 +75,9 @@ loop:
 				log.Println(err)
 				continue
 			}
-
+			if s.options.Trace {
+				log.Println("connect: ", accept.RemoteAddr())
+			}
 			go s.process(accept)
 		}
 

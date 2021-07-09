@@ -1,6 +1,8 @@
 package client
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"time"
@@ -68,13 +70,14 @@ func (b *BaseClient) Call(ctx *light.Context, serviceMethod string, request inte
 	if err != nil {
 		return err
 	}
+
 	// 1.2 加密
-	metaDataBytes, err = cryptology.AESEncrypt(metaDataBytes, b.aesKey)
+	metaDataBytes, err = cryptology.AESEncrypt(b.aesKey, metaDataBytes)
 	if err != nil {
 		return err
 	}
 
-	requestBytes, err = cryptology.AESEncrypt(requestBytes, b.aesKey)
+	requestBytes, err = cryptology.AESEncrypt(b.aesKey, requestBytes)
 	if err != nil {
 		return err
 	}
@@ -100,9 +103,25 @@ func (b *BaseClient) Call(ctx *light.Context, serviceMethod string, request inte
 	}
 	_, err = b.conn.Write(message)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
-	// 3.封装回执
 
+	fmt.Println("read ...")
+	// 3.封装回执
+	now := time.Now()
+	b.conn.SetReadDeadline(now.Add(b.options.readTimeout))
+
+	proto := protocol.NewProtocol()
+	decode, err := proto.IODecode(b.conn)
+	if err != nil {
+		return err
+	}
+	marshal, err := json.Marshal(decode)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(marshal))
 	return nil
 }

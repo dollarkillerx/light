@@ -3,42 +3,38 @@ package utils
 import (
 	"errors"
 	"sync"
-
-	"github.com/dollarkillerx/light/protocol"
 )
 
 type XChannel struct {
 	rw    sync.RWMutex
 	close bool
-	ch    chan *protocol.Message
+	Ch    chan []byte
 }
 
 func NewXChannel(size int) *XChannel {
 	return &XChannel{
-		ch: make(chan *protocol.Message, size),
+		Ch: make(chan []byte, size),
 	}
 }
 
-func (x *XChannel) Send(msg *protocol.Message) error {
+func (x *XChannel) Send(msg []byte) error {
 	x.rw.RLock()
-	defer x.rw.Unlock()
+	defer x.rw.RUnlock()
 
 	if x.close {
 		return errors.New("channel close")
 	}
-	x.ch <- msg
 
+	x.Ch <- msg
 	return nil
-}
-
-func (x *XChannel) Read() <-chan *protocol.Message {
-	return x.ch
 }
 
 func (x *XChannel) Close() {
 	x.rw.Lock()
 	defer x.rw.Unlock()
 
-	x.close = true
-	close(x.ch)
+	if x.close == false {
+		x.close = true
+		close(x.Ch)
+	}
 }

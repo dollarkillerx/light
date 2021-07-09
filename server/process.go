@@ -1,27 +1,37 @@
 package server
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"reflect"
 	"time"
 
+	"github.com/dollarkillerx/light"
+	"github.com/dollarkillerx/light/codes"
+	"github.com/dollarkillerx/light/cryptology"
 	"github.com/dollarkillerx/light/protocol"
 	"github.com/dollarkillerx/light/utils"
 )
 
 func (s *Server) process(conn net.Conn) {
 	defer func() {
+		// 网络不可靠
 		if err := recover(); err != nil {
 			utils.PrintStack()
 			log.Println("Recover Err: ", err)
 		}
-	}() // 网络不可靠
+	}()
 
 	defer func() {
-		conn.Close() // 退出 回收句柄
+		// 退出 回收句柄
+		err := conn.Close()
+		if err != nil {
+			log.Println(err)
+			return
+		}
 	}()
 
 	// 初始化
@@ -44,42 +54,181 @@ func (s *Server) process(conn net.Conn) {
 	}
 
 	xChannel := utils.NewXChannel(s.options.processChanSize)
-	rChannel := xChannel.Read()
-loop:
-	for { // 具体消息获取
-		select {
-		case msg, ex := <-rChannel:
-			if !ex {
-				break loop
-			}
-			now := time.Now()
-			if s.options.writeTimeout > 0 {
-				conn.SetWriteDeadline(now.Add(s.options.writeTimeout))
-			}
-			// send message
-			msg = msg
-		default:
-			now := time.Now()
-			if s.options.readTimeout > 0 {
-				conn.SetReadDeadline(now.Add(s.options.readTimeout))
-			}
-
-			// TODO: heartBeat 逻辑
-
-			proto := protocol.NewProtocol()
-			msg, err := proto.IODecode(conn)
-			if err != nil {
-				if err == io.EOF {
+	// send
+	go func() {
+	loop:
+		for {
+			select {
+			case msg, ex := <-xChannel.Ch:
+				if !ex {
+					if s.options.Trace {
+						log.Printf("ip: %s  close send server", conn.RemoteAddr())
+					}
 					break loop
 				}
-				continue
+				now := time.Now()
+				if s.options.writeTimeout > 0 {
+					conn.SetWriteDeadline(now.Add(s.options.writeTimeout))
+				}
+				// send message
+				_, err := conn.Write(msg)
+				if err != nil {
+					if s.options.Trace {
+						log.Printf("ip: %s err: %s", conn.RemoteAddr(), err)
+					}
+					break loop
+				}
 			}
-			marshal, err := json.Marshal(msg)
-			if err != nil {
-				log.Fatalln(err)
-				return
-			}
-			fmt.Println(string(marshal))
 		}
+	}()
+
+	defer func() {
+		xChannel.Close()
+	}()
+loop:
+	for { // 具体消息获取
+		now := time.Now()
+		if s.options.readTimeout > 0 {
+			conn.SetReadDeadline(now.Add(s.options.readTimeout))
+		}
+
+		// TODO: heartBeat 逻辑
+		proto := protocol.NewProtocol()
+		msg, err := proto.IODecode(conn)
+		if err != nil {
+			if err == io.EOF {
+				if s.options.Trace {
+					log.Printf("ip: %s close", conn.RemoteAddr())
+				}
+				break loop
+			}
+
+			// 遇到错误关闭链接
+			if s.options.Trace {
+				log.Printf("ip: %s err: %s", conn.RemoteAddr(), err)
+			}
+			break loop
+		}
+
+		go s.processResponse(xChannel, msg, conn.RemoteAddr().String())
+	}
+}
+
+func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message, addr string) {
+	var err error
+	defer func() {
+		if err != nil {
+			if s.options.Trace {
+				fmt.Println("ProcessResponse Error: ", err, "  ID: ", addr)
+			}
+			xChannel.Close()
+		}
+	}()
+
+	// 1. 解压缩
+	compressor, ex := codes.CompressorManager.Get(codes.CompressorType(msg.Header.CompressorType))
+	if !ex {
+		err = errors.New("compressor 404")
+		return
+	}
+	msg.MetaData, err = compressor.Unzip(msg.MetaData)
+	if err != nil {
+		return
+	}
+
+	msg.Payload, err = compressor.Unzip(msg.Payload)
+	if err != nil {
+		return
+	}
+	// 2. 解密
+	msg.MetaData, err = cryptology.AESDecrypt(s.options.AesKey, msg.MetaData)
+	if err != nil {
+		return
+	}
+
+	msg.Payload, err = cryptology.AESDecrypt(s.options.AesKey, msg.Payload)
+	if err != nil {
+		return
+	}
+
+	// 3. 反序列化
+	serialization, ex := codes.SerializationManager.Get(codes.SerializationType(msg.Header.SerializationType))
+	if !ex {
+		err = errors.New("serialization 404")
+		return
+	}
+
+	metaData := make(map[string]string)
+	err = serialization.Decode(msg.MetaData, &metaData)
+	if err != nil {
+		return
+	}
+
+	ctx := light.DefaultCtx()
+	for k, v := range metaData {
+		ctx.SetValue(k, v)
+	}
+
+	ser, ex := s.serviceMap[msg.ServiceName]
+	if !ex {
+		err = errors.New("service does not exist")
+		return
+	}
+
+	method, ex := ser.methodType[msg.ServiceMethod]
+	if !ex {
+		err = errors.New("method does not exist")
+		return
+	}
+
+	req := utils.RefNew(method.RequestType)
+	resp := utils.RefNew(method.ResponseType)
+
+	err = serialization.Decode(msg.Payload, req)
+	if err != nil {
+		return
+	}
+
+	var respBody []byte
+	callErr := ser.call(ctx, method, reflect.ValueOf(req), reflect.ValueOf(resp))
+	if callErr != nil {
+		respBody, _ = serialization.Encode(callErr)
+	} else {
+		var err2 error
+		respBody, err2 = serialization.Encode(resp)
+		if err2 != nil {
+			respBody, _ = serialization.Encode(err2)
+		}
+	}
+	// 1. 序列化
+	var metaDataByte []byte
+	metaDataByte, _ = serialization.Encode(ctx.GetMetaData())
+	// 2. 加密
+	metaDataByte, err = cryptology.AESEncrypt(s.options.AesKey, metaDataByte)
+	if err != nil {
+		return
+	}
+	respBody, err = cryptology.AESEncrypt(s.options.AesKey, respBody)
+	if err != nil {
+		return
+	}
+	// 3. 压缩
+	metaDataByte, err = compressor.Zip(metaDataByte)
+	if err != nil {
+		return
+	}
+	respBody, err = compressor.Zip(respBody)
+	if err != nil {
+		return
+	}
+	// 4. 打包
+	message, err := protocol.EncodeMessage([]byte(msg.ServiceName), []byte(msg.ServiceMethod), metaDataByte, byte(protocol.Response), msg.Header.CompressorType, msg.Header.SerializationType, respBody)
+	if err != nil {
+		return
+	}
+	// 5. 回写
+	err = xChannel.Send(message)
+	if err != nil {
+		return
 	}
 }

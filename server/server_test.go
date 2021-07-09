@@ -13,13 +13,31 @@ type TestMethod struct {
 }
 
 type MethodTestReq struct {
+	Name string
 }
 
 type MethodTestResp struct {
+	RPName string
 }
 
 func (m *TestMethod) HelloWorld(ctx *light.Context, req *MethodTestReq, resp *MethodTestResp) error {
+	resp.RPName = fmt.Sprintf("hello: %s", req.Name)
 	return nil
+}
+
+func TestServer(t *testing.T) {
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
+	server := NewServer()
+	err := server.Register(&TestMethod{})
+	if err != nil {
+		log.Fatalln(err)
+		return
+	}
+
+	err = server.Run(Trace())
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
 
 func TestMethodF(t *testing.T) {

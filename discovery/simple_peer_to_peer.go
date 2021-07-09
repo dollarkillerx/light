@@ -1,15 +1,22 @@
 package discovery
 
+import "github.com/dollarkillerx/light/transport"
+
 type SimplePeerToPeer struct {
-	addr string
+	ser *Server
 }
 
-func (s SimplePeerToPeer) Discovery(serName string) ([]string, error) {
-	return []string{s.addr}, nil
+func (s *SimplePeerToPeer) Discovery(serName string) ([]*Server, error) {
+	var sr []*Server
+	sr = append(sr, s.ser)
+	return sr, nil
 }
 
-func NewSimplePeerToPeer(addr string) *SimplePeerToPeer {
+func NewSimplePeerToPeer(addr string, protocol transport.Protocol) *SimplePeerToPeer {
 	return &SimplePeerToPeer{
-		addr: addr,
+		ser: &Server{
+			Addr:     addr,
+			Protocol: protocol,
+		},
 	}
 }

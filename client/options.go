@@ -8,12 +8,10 @@ import (
 	"github.com/dollarkillerx/light/cryptology"
 	"github.com/dollarkillerx/light/discovery"
 	"github.com/dollarkillerx/light/load_banlancing"
-	"github.com/dollarkillerx/light/transport"
 )
 
 type Options struct {
 	Discovery         discovery.Discovery
-	protocol          transport.Protocol
 	loadBalancing     load_banlancing.LoadBalancing
 	serializationType codes.SerializationType
 	compressorType    codes.CompressorType
@@ -28,7 +26,6 @@ type Options struct {
 func defaultOptions() *Options {
 	return &Options{
 		pool:              25,
-		protocol:          transport.KCP,
 		serializationType: codes.MsgPack,
 		compressorType:    codes.Snappy,
 		loadBalancing:     load_banlancing.NewPolling(),
@@ -40,12 +37,6 @@ func defaultOptions() *Options {
 }
 
 type Option func(options *Options)
-
-func UseSimpleP2pDiscovery(addr string) Option {
-	return func(options *Options) {
-		options.Discovery = discovery.NewSimplePeerToPeer(addr)
-	}
-}
 
 func SetPoolSize(p int) Option {
 	if p <= 0 {

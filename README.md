@@ -27,3 +27,7 @@ LightRPC Multi-protocol encryption RPC
 - [ ] GO
 - [ ] RUST
 - [ ] Python
+
+## TODO
+- [ ] Heartbeat
+- [ ] Client connection pool

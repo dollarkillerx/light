@@ -3,7 +3,6 @@ package protocol
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"hash/crc32"
 	"io"
 
@@ -36,15 +35,12 @@ const HeadSize = 29
 */
 
 type Message struct {
-	Header            *Header
-	MagicNumber       string
-	RespType          byte
-	CompressorType    byte
-	SerializationType byte
-	ServiceName       string
-	ServiceMethod     string
-	MetaData          []byte
-	Payload           []byte
+	Header        *Header
+	MagicNumber   string
+	ServiceName   string
+	ServiceMethod string
+	MetaData      []byte
+	Payload       []byte
 }
 
 type Header struct {
@@ -140,6 +136,7 @@ func DecodeMessage(data []byte) (*Message, error) {
 
 func DecodeMessageV2(data []byte, header *Header, headSize uint32) (*Message, error) {
 	var result Message
+	result.Header = header
 	var st uint32 = headSize
 	endI := st + header.MagicNumberSize
 	les := endI - st
@@ -214,7 +211,6 @@ func EncodeMessage(server, method, metaData []byte, respType, compressorType, se
 
 	st = endI
 	endI = st + len(payload)
-	fmt.Println(bufSize)
 	copy(buf[st:endI], payload)
 
 	if Crc32 {

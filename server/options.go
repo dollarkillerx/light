@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log"
 	"net"
 	"time"
 
@@ -15,24 +16,29 @@ type Options struct {
 	nl       net.Listener
 	ctx      context.Context
 	options  map[string]interface{} // 零散配置
+	Trace    bool
 
 	readTimeout     time.Duration
 	writeTimeout    time.Duration
 	processChanSize int
+
+	AesKey []byte
 }
 
 func defaultOptions() *Options {
 	return &Options{
-		Protocol:     transport.KCP, // default KCP
+		Protocol:     transport.TCP, // default TCP
 		Uri:          "0.0.0.0:8397",
 		UseHttp:      false,
-		readTimeout:  time.Second * 30,
+		readTimeout:  time.Minute * 3, // 心跳包 默认 3min
 		writeTimeout: time.Second * 30,
 		ctx:          context.Background(),
 		options: map[string]interface{}{
 			"TCPKeepAlivePeriod": time.Minute * 3,
 		},
 		processChanSize: 1000,
+		Trace:           false,
+		AesKey:          []byte("58a95a8f804b49e686f651a0d3f6e631"),
 	}
 }
 
@@ -68,7 +74,9 @@ func UseHTTP() Option {
 
 func SetTimeout(readTimeout time.Duration, writeTimeout time.Duration) Option {
 	return func(options *Options) {
-		options.readTimeout = readTimeout
+		if readTimeout > time.Minute*3 {
+			options.readTimeout = readTimeout
+		}
 		options.writeTimeout = writeTimeout
 	}
 }
@@ -76,5 +84,22 @@ func SetTimeout(readTimeout time.Duration, writeTimeout time.Duration) Option {
 func SetContext(ctx context.Context) Option {
 	return func(options *Options) {
 		options.ctx = ctx
+	}
+}
+
+func Trace() Option {
+	return func(options *Options) {
+		options.Trace = true
+	}
+}
+
+func SetAESCryptology(key []byte) Option {
+	if len(key) != 32 && len(key) != 16 {
+		log.Fatalln("AES KEY LEN == 32 OR == 16")
+	}
+
+	return func(options *Options) {
+		//options.AesKey = cryptology.AES
+		options.AesKey = key
 	}
 }

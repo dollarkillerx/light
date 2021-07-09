@@ -17,6 +17,13 @@ func NewCtx(ctx context.Context) *Context {
 	}
 }
 
+func DefaultCtx() *Context {
+	return &Context{
+		ctx:      context.Background(),
+		metaData: map[string]string{},
+	}
+}
+
 func (c *Context) Value(key string) string {
 	return c.metaData[key]
 }

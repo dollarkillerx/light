@@ -5,13 +5,14 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"io"
 )
 
 // AESEncrypt AES加密
 func AESEncrypt(key []byte, plaintext []byte) ([]byte, error) {
 	if len(key) != 16 && len(key) != 32 {
-		return nil, errors.New("key != 16 or != 32")
+		return nil, errors.New(fmt.Sprintf("key != 16 or != 32 key: %d", len(key)))
 	}
 
 	block, err := aes.NewCipher(key)

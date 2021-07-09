@@ -1,23 +1,25 @@
 package load_banlancing
 
+import "github.com/dollarkillerx/light/discovery"
+
 // Polling 轮训
 type Polling struct {
-	ser []string
+	ser []*discovery.Server
 	idx int
 }
 
 func NewPolling() *Polling {
 	return &Polling{
-		ser: []string{},
+		ser: []*discovery.Server{},
 		idx: 0,
 	}
 }
 
-func (p *Polling) InitBalancing(sers []string) {
+func (p *Polling) InitBalancing(sers []*discovery.Server) {
 	p.ser = sers
 }
 
-func (p *Polling) GetService() string {
+func (p *Polling) GetService() *discovery.Server {
 	if p.idx >= len(p.ser)-1 {
 		p.idx = 0
 	}
