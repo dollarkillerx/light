@@ -2,6 +2,8 @@ package client
 
 import (
 	"context"
+	"fmt"
+	"github.com/rs/xid"
 	"log"
 	"time"
 
@@ -56,7 +58,10 @@ func (c *Connect) Call(ctx *light.Context, serviceMethod string, request interfa
 		go c.pool.Put(client, nil)
 	}()
 
+	id := xid.New().String()
+	fmt.Println("Send Start: ", id)
 	err = client.Call(ctx, serviceMethod, request, response)
+	fmt.Println("send end: ", id)
 	if err != nil {
 		log.Println(err)
 		return err

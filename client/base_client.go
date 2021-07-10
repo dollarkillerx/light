@@ -158,16 +158,17 @@ func (b *BaseClient) call(ctx *light.Context, serviceMethod string, request inte
 		now := time.Now()
 		timeout := ctx.GetTimeout() // 如果ctx 存在设置 则采用 返之使用默认配置
 		if timeout > 0 {
+			b.conn.SetDeadline(now.Add(timeout))
 			b.conn.SetWriteDeadline(now.Add(timeout))
 		} else {
+			b.conn.SetDeadline(now.Add(b.options.writeTimeout))
 			b.conn.SetWriteDeadline(now.Add(b.options.writeTimeout))
 		}
 	}
-
 	// 有点暴力呀 直接上锁
 	b.writeMu.Lock()
-	b.writeMu.Unlock()
 	_, err = b.conn.Write(message)
+	b.writeMu.Unlock()
 	if err != nil {
 		log.Println(err)
 		return "", err
@@ -194,8 +195,12 @@ func (b *BaseClient) heartBeat() {
 		}
 
 		b.writeMu.Lock()
-		b.conn.Write(i)
+		_, err = b.conn.Write(i)
 		b.writeMu.Unlock()
+		if err != nil {
+			log.Println(err)
+			break
+		}
 		time.Sleep(b.options.heartBeat)
 	}
 }
@@ -284,3 +289,5 @@ func (b *BaseClient) processMessage() (magic string, respChan chan error, err er
 
 	return msg.MagicNumber, message.respChan, b.serialization.Decode(msg.Payload, message.response)
 }
+
+// broken pipe or EOF

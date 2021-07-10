@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 )
@@ -59,47 +58,5 @@ func (c *connectPool) Get(ctx context.Context) (LightClient, error) {
 }
 
 func (c *connectPool) Put(client LightClient, err error) {
-	if err != nil {
-		go func() {
-			for {
-				client = c.rv()
-				if client != nil {
-					time.Sleep(time.Second)
-					continue
-				}
-				break
-			}
-		}()
-	}
-
 	c.pool <- client
-}
-
-// rv 再次发现
-func (c *connectPool) rv() LightClient {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return nil
-	//hosts, err := c.connect.Client.options.Discovery.Discovery(c.connect.serverName)
-	//if err != nil {
-	//	log.Println(err)
-	//}
-	//
-	//if len(hosts) != 0 {
-	//	c.connect.Client.options.loadBalancing.InitBalancing(hosts)
-	//}
-	//
-	//service := c.connect.Client.options.loadBalancing.GetService()
-	//con, err := transport.Client.Gen(service.Protocol, service.Addr)
-	//if err != nil {
-	//	log.Println(err)
-	//	return nil
-	//}
-	//
-	//client, err := newBaseClient(c.connect.serverName, c.connect.Client.options)
-	//if err != nil {
-	//	log.Println(err)
-	//	return nil
-	//}
-	//return client
 }
