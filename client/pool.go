@@ -3,16 +3,17 @@ package client
 import (
 	"context"
 	"fmt"
-	"log"
+	"sync"
 	"time"
 
-	"github.com/dollarkillerx/light/transport"
 	"github.com/pkg/errors"
 )
 
 type connectPool struct {
 	connect *Connect
 	pool    chan LightClient
+
+	mu sync.Mutex
 }
 
 func initPool(c *Connect) (*connectPool, error) {
@@ -38,13 +39,7 @@ func (c *connectPool) initPool() error {
 
 	// 初始化连接池
 	for i := 0; i < c.connect.Client.options.pool; i++ {
-		service := c.connect.Client.options.loadBalancing.GetService()
-		con, err := transport.Client.Gen(service.Protocol, service.Addr)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		client, err := newBaseClient(c.connect.serverName, con, c.connect.Client.options)
+		client, err := newBaseClient(c.connect.serverName, c.connect.Client.options)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -65,40 +60,46 @@ func (c *connectPool) Get(ctx context.Context) (LightClient, error) {
 
 func (c *connectPool) Put(client LightClient, err error) {
 	if err != nil {
-		for {
-			client = c.rv()
-			if client != nil {
-				time.Sleep(time.Second)
-				continue
+		go func() {
+			for {
+				client = c.rv()
+				if client != nil {
+					time.Sleep(time.Second)
+					continue
+				}
+				break
 			}
-			break
-		}
+		}()
 	}
 
 	c.pool <- client
 }
 
+// rv 再次发现
 func (c *connectPool) rv() LightClient {
-	hosts, err := c.connect.Client.options.Discovery.Discovery(c.connect.serverName)
-	if err != nil {
-		log.Println(err)
-	}
-
-	if len(hosts) != 0 {
-		c.connect.Client.options.loadBalancing.InitBalancing(hosts)
-	}
-
-	service := c.connect.Client.options.loadBalancing.GetService()
-	con, err := transport.Client.Gen(service.Protocol, service.Addr)
-	if err != nil {
-		log.Println(err)
-		return nil
-	}
-
-	client, err := newBaseClient(c.connect.serverName, con, c.connect.Client.options)
-	if err != nil {
-		log.Println(err)
-		return nil
-	}
-	return client
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return nil
+	//hosts, err := c.connect.Client.options.Discovery.Discovery(c.connect.serverName)
+	//if err != nil {
+	//	log.Println(err)
+	//}
+	//
+	//if len(hosts) != 0 {
+	//	c.connect.Client.options.loadBalancing.InitBalancing(hosts)
+	//}
+	//
+	//service := c.connect.Client.options.loadBalancing.GetService()
+	//con, err := transport.Client.Gen(service.Protocol, service.Addr)
+	//if err != nil {
+	//	log.Println(err)
+	//	return nil
+	//}
+	//
+	//client, err := newBaseClient(c.connect.serverName, c.connect.Client.options)
+	//if err != nil {
+	//	log.Println(err)
+	//	return nil
+	//}
+	//return client
 }

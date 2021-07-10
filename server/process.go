@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -92,7 +91,6 @@ loop:
 			conn.SetReadDeadline(now.Add(s.options.readTimeout))
 		}
 
-		// TODO: heartBeat 逻辑
 		proto := protocol.NewProtocol()
 		msg, err := proto.IODecode(conn)
 		if err != nil {
@@ -119,11 +117,32 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 	defer func() {
 		if err != nil {
 			if s.options.Trace {
-				fmt.Println("ProcessResponse Error: ", err, "  ID: ", addr)
+				log.Println("ProcessResponse Error: ", err, "  ID: ", addr)
 			}
 			xChannel.Close()
 		}
 	}()
+
+	// heartBeat 判断
+	if msg.Header.RespType == byte(protocol.HeartBeat) {
+		// 心跳返回
+		if s.options.Trace {
+			log.Println("HeartBeat: ", addr)
+		}
+
+		// 4. 打包
+		_, message, err := protocol.EncodeMessage(msg.MagicNumber, []byte(msg.ServiceName), []byte(msg.ServiceMethod), []byte(""), byte(protocol.HeartBeat), msg.Header.CompressorType, msg.Header.SerializationType, []byte(""))
+		if err != nil {
+			return
+		}
+		// 5. 回写
+		err = xChannel.Send(message)
+		if err != nil {
+			return
+		}
+
+		return
+	}
 
 	// 1. 解压缩
 	compressor, ex := codes.CompressorManager.Get(codes.CompressorType(msg.Header.CompressorType))
@@ -216,7 +235,7 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 		return
 	}
 	// 4. 打包
-	message, err := protocol.EncodeMessage([]byte(msg.ServiceName), []byte(msg.ServiceMethod), metaDataByte, byte(protocol.Response), msg.Header.CompressorType, msg.Header.SerializationType, respBody)
+	_, message, err := protocol.EncodeMessage(msg.MagicNumber, []byte(msg.ServiceName), []byte(msg.ServiceMethod), metaDataByte, byte(protocol.Response), msg.Header.CompressorType, msg.Header.SerializationType, respBody)
 	if err != nil {
 		return
 	}

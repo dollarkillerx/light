@@ -8,4 +8,5 @@ var (
 	ErrCrc32            = errors.New("checksumIEEE error")
 	ErrSerialization404 = errors.New("serialization 404")
 	ErrCompressor404    = errors.New("compressor 404")
+	ErrTimeout          = errors.New("time out")
 )

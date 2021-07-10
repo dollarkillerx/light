@@ -44,7 +44,7 @@ func TestProtocol(t *testing.T) {
 		return
 	}
 
-	message, err := EncodeMessage(serverName, serverPath, mt, byte(Request), byte(codes.Byte), byte(codes.Json), encode)
+	_, message, err := EncodeMessage("", serverName, serverPath, mt, byte(Request), byte(codes.Byte), byte(codes.Json), encode)
 	if err != nil {
 		log.Fatalln(err)
 		return

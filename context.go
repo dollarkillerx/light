@@ -1,10 +1,14 @@
 package light
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type Context struct {
-	ctx      context.Context
-	metaData map[string]string
+	ctx         context.Context
+	metaData    map[string]string
+	internalMap map[string]interface{}
 }
 
 func NewCtx(ctx context.Context) *Context {
@@ -12,15 +16,17 @@ func NewCtx(ctx context.Context) *Context {
 		ctx = context.Background()
 	}
 	return &Context{
-		ctx:      ctx,
-		metaData: map[string]string{},
+		ctx:         ctx,
+		metaData:    map[string]string{},
+		internalMap: map[string]interface{}{},
 	}
 }
 
 func DefaultCtx() *Context {
 	return &Context{
-		ctx:      context.Background(),
-		metaData: map[string]string{},
+		ctx:         context.Background(),
+		metaData:    map[string]string{},
+		internalMap: map[string]interface{}{},
 	}
 }
 
@@ -38,4 +44,18 @@ func (c *Context) GetMetaData() map[string]string {
 
 func (c *Context) SetMetaData(r map[string]string) {
 	c.metaData = r
+}
+
+func (c *Context) SetTimeout(timeout time.Duration) {
+	if timeout > 0 {
+		c.internalMap["timeout"] = timeout
+	}
+}
+
+func (c *Context) GetTimeout() time.Duration {
+	i, ex := c.internalMap["timeout"]
+	if !ex {
+		return 0
+	}
+	return i.(time.Duration)
 }

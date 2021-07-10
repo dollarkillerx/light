@@ -3,10 +3,9 @@ package protocol
 import (
 	"encoding/binary"
 	"errors"
+	"github.com/rs/xid"
 	"hash/crc32"
 	"io"
-
-	"github.com/rs/xid"
 )
 
 type RequestType byte
@@ -14,6 +13,7 @@ type RequestType byte
 const (
 	Request RequestType = iota
 	Response
+	HeartBeat
 )
 
 //var MaxPayloadMemory = 10 << 20 // 每个请求体最大 10M 超过进行拆分
@@ -176,8 +176,11 @@ func DecodeMessageV2(data []byte, header *Header, headSize uint32) (*Message, er
 }
 
 // EncodeMessage 基础编码
-func EncodeMessage(server, method, metaData []byte, respType, compressorType, serializationType byte, payload []byte) ([]byte, error) {
-	magicNumber := []byte(xid.New().String())
+func EncodeMessage(magicStr string, server, method, metaData []byte, respType, compressorType, serializationType byte, payload []byte) (magic string, data []byte, err error) {
+	var magicNumber = []byte(magicStr)
+	if magicStr == "" {
+		magicNumber = []byte(xid.New().String())
+	}
 
 	bufSize := HeadSize + len(server) + len(method) + len(metaData) + len(payload) + len(magicNumber)
 	buf := make([]byte, bufSize)
@@ -218,5 +221,5 @@ func EncodeMessage(server, method, metaData []byte, respType, compressorType, se
 		binary.LittleEndian.PutUint32(buf[2:6], u)
 	}
 
-	return buf, nil
+	return string(magicNumber), buf, nil
 }

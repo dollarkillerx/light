@@ -2,10 +2,11 @@ package client
 
 import (
 	"context"
-	"github.com/dollarkillerx/light"
-	"github.com/dollarkillerx/light/discovery"
 	"log"
 	"time"
+
+	"github.com/dollarkillerx/light"
+	"github.com/dollarkillerx/light/discovery"
 )
 
 type Client struct {
@@ -52,12 +53,12 @@ func (c *Connect) Call(ctx *light.Context, serviceMethod string, request interfa
 		return err
 	}
 	defer func() {
-		go c.pool.Put(client, err)
+		go c.pool.Put(client, nil)
 	}()
 
 	err = client.Call(ctx, serviceMethod, request, response)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
 		return err
 	}
 

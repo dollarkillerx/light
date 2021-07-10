@@ -21,6 +21,7 @@ type Options struct {
 	aesKey       []byte
 	writeTimeout time.Duration
 	readTimeout  time.Duration
+	heartBeat    time.Duration
 }
 
 func defaultOptions() *Options {
@@ -33,6 +34,7 @@ func defaultOptions() *Options {
 		aesKey:            []byte("58a95a8f804b49e686f651a0d3f6e631"),
 		writeTimeout:      time.Minute,
 		readTimeout:       time.Minute,
+		heartBeat:         time.Minute * 2,
 	}
 }
 
@@ -81,5 +83,13 @@ func SetTimeOut(writeTimeout time.Duration, readTimeout time.Duration) Option {
 	return func(options *Options) {
 		options.writeTimeout = writeTimeout
 		options.readTimeout = readTimeout
+	}
+}
+
+func SetHeartBeat(heartBeat time.Duration) Option {
+	return func(options *Options) {
+		if heartBeat > 0 {
+			options.heartBeat = heartBeat
+		}
 	}
 }
