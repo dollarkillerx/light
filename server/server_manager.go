@@ -3,9 +3,11 @@ package server
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 
 	"github.com/dollarkillerx/light/transport"
+	"github.com/dollarkillerx/light/utils"
 )
 
 type Server struct {
@@ -60,6 +62,28 @@ func (s *Server) Run(options ...Option) error {
 	}
 
 	log.Printf("LightRPC: %s  %s \n", s.options.Protocol, s.options.Uri)
+
+	if s.options.Discovery != nil {
+		sIdb, err := ioutil.ReadFile("./light.conf")
+		if err != nil {
+			id, err := utils.DistributedID()
+			if err != nil {
+				return err
+			}
+			sIdb = []byte(id)
+		}
+		// 进行服务注册
+		sId := string(sIdb)
+		for k := range s.serviceMap {
+			err := s.options.Discovery.Registry(k, s.options.registryAddr, s.options.weights, s.options.Protocol, &sId)
+			if err != nil {
+				return err
+			}
+			log.Printf("Discovery Registry: %s addr: %s SUCCESS", k, s.options.registryAddr)
+		}
+
+		ioutil.WriteFile("./light.conf", sIdb, 00666)
+	}
 	return s.run()
 }
 

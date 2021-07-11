@@ -186,6 +186,30 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 	ctx := light.DefaultCtx()
 	ctx.SetMetaData(metaData)
 
+	// 1.3 auth
+	if s.options.AuthFunc != nil {
+		auth := metaData["AUTH"]
+		err := s.options.AuthFunc(ctx, auth)
+		if err != nil {
+			ctx.SetValue("RespError", err.Error())
+			var metaDataByte []byte
+			metaDataByte, _ = serialization.Encode(ctx.GetMetaData())
+			metaDataByte, _ = cryptology.AESEncrypt(s.options.AesKey, metaDataByte)
+			metaDataByte, _ = compressor.Zip(metaDataByte)
+			// 4. 打包
+			_, message, err := protocol.EncodeMessage(msg.MagicNumber, []byte(msg.ServiceName), []byte(msg.ServiceMethod), metaDataByte, byte(protocol.Response), msg.Header.CompressorType, msg.Header.SerializationType, []byte(""))
+			if err != nil {
+				return
+			}
+			// 5. 回写
+			err = xChannel.Send(message)
+			if err != nil {
+				return
+			}
+			return
+		}
+	}
+
 	ser, ex := s.serviceMap[msg.ServiceName]
 	if !ex {
 		err = errors.New("service does not exist")

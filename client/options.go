@@ -23,6 +23,7 @@ type Options struct {
 	readTimeout  time.Duration
 	heartBeat    time.Duration
 	Trace        bool
+	AUTH         string
 }
 
 func defaultOptions() *Options {
@@ -34,9 +35,10 @@ func defaultOptions() *Options {
 		cryptology:        cryptology.AES,
 		aesKey:            []byte("58a95a8f804b49e686f651a0d3f6e631"),
 		writeTimeout:      time.Minute,
-		readTimeout:       time.Minute,
-		heartBeat:         time.Minute * 2,
+		readTimeout:       time.Minute * 3,
+		heartBeat:         time.Minute,
 		Trace:             false,
+		AUTH:              "",
 	}
 }
 
@@ -99,5 +101,11 @@ func SetHeartBeat(heartBeat time.Duration) Option {
 func Trance() Option {
 	return func(options *Options) {
 		options.Trace = true
+	}
+}
+
+func SetAUTH(token string) Option {
+	return func(options *Options) {
+		options.AUTH = token
 	}
 }

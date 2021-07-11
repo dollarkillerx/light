@@ -6,8 +6,12 @@ import (
 	"net"
 	"time"
 
+	"github.com/dollarkillerx/light"
+	"github.com/dollarkillerx/light/discovery"
 	"github.com/dollarkillerx/light/transport"
 )
+
+type AuthFunc func(ctx *light.Context, token string) error
 
 type Options struct {
 	Protocol transport.Protocol
@@ -22,7 +26,11 @@ type Options struct {
 	writeTimeout    time.Duration
 	processChanSize int
 
-	AesKey []byte
+	AesKey       []byte
+	AuthFunc     AuthFunc
+	Discovery    discovery.Discovery
+	registryAddr string
+	weights      float64
 }
 
 func defaultOptions() *Options {
@@ -101,5 +109,20 @@ func SetAESCryptology(key []byte) Option {
 	return func(options *Options) {
 		//options.AesKey = cryptology.AES
 		options.AesKey = key
+	}
+}
+
+func SetAUTH(auth AuthFunc) Option {
+	return func(options *Options) {
+		options.AuthFunc = auth
+	}
+}
+
+// SetDiscovery discovery, addr 注册本服务地址
+func SetDiscovery(discovery discovery.Discovery, addr string, weights float64) Option {
+	return func(options *Options) {
+		options.Discovery = discovery
+		options.registryAddr = addr
+		options.weights = weights
 	}
 }

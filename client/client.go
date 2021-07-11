@@ -56,6 +56,7 @@ func (c *Connect) Call(ctx *light.Context, serviceMethod string, request interfa
 		c.pool.Put(client)
 	}()
 
+	ctx.SetValue("AUTH", c.Client.options.AUTH)
 	err = client.Call(ctx, serviceMethod, request, response)
 	if err != nil {
 		return errors.WithStack(err)

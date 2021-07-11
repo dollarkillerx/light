@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"strconv"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/sony/sonyflake"
 )
 
 // IsPublic is public
@@ -38,4 +41,22 @@ func PrintStack() {
 	var buf [4096]byte
 	n := runtime.Stack(buf[:], false)
 	fmt.Printf("==> %s\n", string(buf[:n]))
+}
+
+var (
+	sonyFlake *sonyflake.Sonyflake
+)
+
+func init() {
+	st := sonyflake.Settings{}
+	sonyFlake = sonyflake.NewSonyflake(st)
+}
+
+func DistributedID() (string, error) {
+	id, err := sonyFlake.NextID()
+	if err != nil {
+		return "", err
+	}
+
+	return strconv.Itoa(int(id)), nil
 }

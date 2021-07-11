@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/dollarkillerx/light"
+	"github.com/dollarkillerx/light/discovery"
 	"github.com/dollarkillerx/light/server"
 )
 
@@ -15,7 +16,11 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if err := ser.Run(server.UseTCP("0.0.0.0:8074"), server.Trace(), server.SetAESCryptology([]byte("58a95a8f804b49e686f651a0d3f6e631"))); err != nil {
+	redisDiscovery, err := discovery.NewRedisDiscovery("127.0.0.1:6379", 10, nil)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if err := ser.Run(server.UseTCP("0.0.0.0:8074"), server.Trace(), server.SetDiscovery(redisDiscovery, "127.0.0.1:8074", 10)); err != nil {
 		log.Fatalln(err)
 	}
 }

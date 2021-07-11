@@ -1,6 +1,8 @@
 package discovery
 
-import "github.com/dollarkillerx/light/transport"
+import (
+	"github.com/dollarkillerx/light/transport"
+)
 
 type SimplePeerToPeer struct {
 	ser *Server
@@ -19,4 +21,12 @@ func NewSimplePeerToPeer(addr string, protocol transport.Protocol) *SimplePeerTo
 			Protocol: protocol,
 		},
 	}
+}
+
+func (s *SimplePeerToPeer) Registry(serName, addr string, weights float64, protocol transport.Protocol, serID *string) error {
+	return nil
+}
+
+func (s *SimplePeerToPeer) UnRegistry(serName string, serID string) error {
+	return nil
 }

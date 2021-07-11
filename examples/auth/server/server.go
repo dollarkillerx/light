@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -15,9 +16,17 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if err := ser.Run(server.UseTCP("0.0.0.0:8074"), server.Trace(), server.SetAESCryptology([]byte("58a95a8f804b49e686f651a0d3f6e631"))); err != nil {
+	if err := ser.Run(server.UseTCP("0.0.0.0:8074"), server.Trace(), server.SetAUTH(authFunc)); err != nil {
 		log.Fatalln(err)
 	}
+}
+
+func authFunc(ctx *light.Context, token string) error {
+	if token == "token" {
+		return nil
+	}
+
+	return errors.New("error 401")
 }
 
 type HelloWorld struct{}
@@ -27,12 +36,10 @@ type HelloWorldRequest struct {
 }
 
 type HelloWorldResponse struct {
-	RPName string
+	Msg string
 }
 
 func (s *HelloWorld) HelloWorld(ctx *light.Context, req *HelloWorldRequest, resp *HelloWorldResponse) error {
-	resp.RPName = fmt.Sprintf("hello world by: %s", req.Name)
-	//return errors.New(":xx")
-	//fmt.Println(resp)
+	resp.Msg = fmt.Sprintf("hello world by: %s", req.Name)
 	return nil
 }

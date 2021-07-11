@@ -242,12 +242,15 @@ func (b *BaseClient) heartBeat() {
 			log.Println(err)
 			break
 		}
-
+		now := time.Now()
+		b.conn.SetDeadline(now.Add(b.options.writeTimeout))
+		b.conn.SetWriteDeadline(now.Add(b.options.writeTimeout))
 		b.writeMu.Lock()
 		_, err = b.conn.Write(i)
 		b.writeMu.Unlock()
 		if err != nil {
 			log.Println(err)
+			go b.reconnection()
 			break
 		}
 		time.Sleep(b.options.heartBeat)
@@ -269,7 +272,9 @@ func (b *BaseClient) processMessageManager() {
 		}
 
 		if err != nil && magic == "" {
-			log.Println(err)
+			if err != io.EOF {
+				log.Println(err)
+			}
 			// 重zhi
 			break
 		}
@@ -331,12 +336,18 @@ func (b *BaseClient) processMessage() (magic string, respChan chan error, err er
 	// 2. 解密
 	msg.MetaData, err = cryptology.AESDecrypt(b.options.aesKey, msg.MetaData)
 	if err != nil {
-		return "", nil, err
+		if len(msg.MetaData) != 0 {
+			return "", nil, err
+		}
+		msg.Payload = []byte("")
 	}
 
 	msg.Payload, err = cryptology.AESDecrypt(b.options.aesKey, msg.Payload)
 	if err != nil {
-		return "", nil, err
+		if len(msg.Payload) != 0 {
+			return "", nil, err
+		}
+		msg.Payload = []byte("")
 	}
 	// 3. 反序列化 RespError
 	mtData := make(map[string]string)

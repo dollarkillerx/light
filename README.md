@@ -20,14 +20,19 @@ LightRPC Multi-protocol encryption RPC
 
 ### Discovery
 - [x] p2p
+- [x] redis `docker run -d --name redis -p 6379:6379 --restart=always  redis:6-alpine`
 - [ ] etcd
 - [ ] consul
 
 ## Programming language support
-- [ ] GO
+- [x] GO
 - [ ] RUST
 - [ ] Python
 
 ## TODO
-- [ ] Heartbeat
-- [ ] Client connection pool
+- [x] Heartbeat
+- [x] Client connection pool
+- [x] Auth
+- [x] Discovery
+- [ ] Middleware
+- [ ] Performance Testing

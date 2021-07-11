@@ -7,7 +7,6 @@ import (
 	"github.com/dollarkillerx/light"
 	"github.com/dollarkillerx/light/client"
 	"github.com/dollarkillerx/light/discovery"
-	"github.com/dollarkillerx/light/transport"
 )
 
 type MethodTestReq struct {
@@ -19,8 +18,13 @@ type MethodTestResp struct {
 }
 
 func main() {
-	client := client.NewClient(discovery.NewSimplePeerToPeer("127.0.0.1:8074", transport.TCP), client.SetAESCryptology([]byte("58a95a8f804b49e686f651a0d3f6e631")))
-	connect, err := client.NewConnect("helloworld")
+	redisDiscovery, err := discovery.NewRedisDiscovery("127.0.0.1:6379", 10, nil)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	c := client.NewClient(redisDiscovery)
+	connect, err := c.NewConnect("helloworld")
 	if err != nil {
 		log.Fatalln(err)
 		return
@@ -36,4 +40,8 @@ func main() {
 	}
 
 	fmt.Println(resp)
+
+	for {
+		select {}
+	}
 }

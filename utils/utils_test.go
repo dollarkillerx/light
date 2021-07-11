@@ -14,3 +14,7 @@ func TestIsPublic(t *testing.T) {
 	rc := map[string]string{}
 	fmt.Println(rc["jex"])
 }
+
+func TestDisID(t *testing.T) {
+	fmt.Println(DistributedID())
+}
