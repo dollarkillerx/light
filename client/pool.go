@@ -57,6 +57,6 @@ func (c *connectPool) Get(ctx context.Context) (LightClient, error) {
 	}
 }
 
-func (c *connectPool) Put(client LightClient, err error) {
+func (c *connectPool) Put(client LightClient) {
 	c.pool <- client
 }

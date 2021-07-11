@@ -2,8 +2,10 @@ package client
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/dollarkillerx/light/transport"
 	"github.com/dollarkillerx/light/utils"
 	"github.com/pkg/errors"
+	"go.uber.org/atomic"
 )
 
 type BaseClient struct {
@@ -29,6 +32,10 @@ type BaseClient struct {
 	respInterMap map[string]*respMessage
 	respInterRM  sync.RWMutex
 	writeMu      sync.Mutex
+	// heartBeat
+	heartBeatMark atomic.Bool
+	// processMessageManager
+	processMessageMark atomic.Bool
 }
 
 type respMessage struct {
@@ -38,6 +45,7 @@ type respMessage struct {
 }
 
 func newBaseClient(serverName string, options *Options) (*BaseClient, error) {
+
 	service := options.loadBalancing.GetService()
 	con, err := transport.Client.Gen(service.Protocol, service.Addr)
 	if err != nil {
@@ -55,19 +63,45 @@ func newBaseClient(serverName string, options *Options) (*BaseClient, error) {
 	}
 
 	bc := &BaseClient{
-		serverName:    serverName,
-		conn:          con,
-		options:       options,
-		serialization: serialization,
-		compressor:    compressor,
-		aesKey:        options.aesKey,
-		respInterMap:  map[string]*respMessage{},
+		serverName:         serverName,
+		conn:               con,
+		options:            options,
+		serialization:      serialization,
+		compressor:         compressor,
+		aesKey:             options.aesKey,
+		respInterMap:       map[string]*respMessage{},
+		heartBeatMark:      atomic.Bool{},
+		processMessageMark: atomic.Bool{},
 	}
 
 	go bc.heartBeat()
 	go bc.processMessageManager()
 
 	return bc, nil
+}
+
+// reconnection broken pipe or EOF
+func (b *BaseClient) reconnection() error {
+	discovery, err := b.options.Discovery.Discovery(b.serverName)
+	if err != nil {
+		return err
+	}
+
+	b.options.loadBalancing.InitBalancing(discovery)
+	service := b.options.loadBalancing.GetService()
+	con, err := transport.Client.Gen(service.Protocol, service.Addr)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	b.writeMu.Lock()
+	defer b.writeMu.Unlock()
+
+	b.conn = con
+	go b.heartBeat()
+	go b.processMessageManager()
+	fmt.Println("Reconnection SUCCESS")
+	return nil
 }
 
 func (b *BaseClient) Call(ctx *light.Context, serviceMethod string, request interface{}, response interface{}) (err error) {
@@ -83,7 +117,7 @@ func (b *BaseClient) Call(ctx *light.Context, serviceMethod string, request inte
 	respChan := make(chan error, 0)
 	magic, err = b.call(ctx, serviceMethod, request, response, respChan)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer func() {
 		// 回收内存
@@ -104,9 +138,9 @@ func (b *BaseClient) Call(ctx *light.Context, serviceMethod string, request inte
 			return nil
 		}
 
-		return err
+		return errors.WithStack(err)
 	case <-time.After(timeout):
-		return pkg.ErrTimeout
+		return errors.WithStack(pkg.ErrTimeout)
 	}
 }
 
@@ -170,8 +204,16 @@ func (b *BaseClient) call(ctx *light.Context, serviceMethod string, request inte
 	_, err = b.conn.Write(message)
 	b.writeMu.Unlock()
 	if err != nil {
-		log.Println(err)
-		return "", err
+		if b.options.Trace {
+			log.Println(err)
+		}
+		if strings.Contains(err.Error(), "broken pipe") {
+			er := b.reconnection()
+			if er != nil {
+				log.Println("Reconnection Error: ", er)
+			}
+		}
+		return "", errors.WithStack(err)
 	}
 
 	// 写MAP
@@ -187,6 +229,13 @@ func (b *BaseClient) call(ctx *light.Context, serviceMethod string, request inte
 }
 
 func (b *BaseClient) heartBeat() {
+	if b.heartBeatMark.Load() {
+		return
+	}
+	b.heartBeatMark.Swap(true)
+	defer func() {
+		b.heartBeatMark.Swap(false)
+	}()
 	for {
 		_, i, err := protocol.EncodeMessage("x", []byte(""), []byte(""), []byte(""), byte(protocol.HeartBeat), byte(b.options.compressorType), byte(b.options.serializationType), []byte(""))
 		if err != nil {
@@ -206,6 +255,13 @@ func (b *BaseClient) heartBeat() {
 }
 
 func (b *BaseClient) processMessageManager() {
+	if b.processMessageMark.Load() {
+		return
+	}
+	b.processMessageMark.Swap(true)
+	defer func() {
+		b.processMessageMark.Swap(false)
+	}()
 	for {
 		magic, respChan, err := b.processMessage()
 		if err == nil && magic == "" {
@@ -236,12 +292,20 @@ func (b *BaseClient) processMessage() (magic string, respChan chan error, err er
 	proto := protocol.NewProtocol()
 	msg, err := proto.IODecode(b.conn)
 	if err != nil {
+		if err == io.EOF {
+			er := b.reconnection()
+			if er != nil {
+				log.Println("Reconnection Error: ", er)
+			}
+		}
 		return "", nil, err
 	}
 
 	// heartbeat
 	if msg.Header.RespType == byte(protocol.HeartBeat) {
-		fmt.Println("is HeartBeat")
+		if b.options.Trace {
+			log.Println("is HeartBeat")
+		}
 		return "", nil, nil
 	}
 
@@ -249,8 +313,9 @@ func (b *BaseClient) processMessage() (magic string, respChan chan error, err er
 	message, ex := b.respInterMap[msg.MagicNumber]
 	b.respInterRM.RUnlock()
 	if !ex { // 不存在 代表消息已经失效
-		fmt.Println("Not Ex", msg.MagicNumber)
-		fmt.Println(b.respInterMap)
+		if b.options.Trace {
+			log.Println("Not Ex", msg.MagicNumber)
+		}
 		return "", nil, nil
 	}
 
@@ -289,5 +354,3 @@ func (b *BaseClient) processMessage() (magic string, respChan chan error, err er
 
 	return msg.MagicNumber, message.respChan, b.serialization.Decode(msg.Payload, message.response)
 }
-
-// broken pipe or EOF

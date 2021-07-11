@@ -1,9 +1,14 @@
 package load_banlancing
 
-import "github.com/dollarkillerx/light/discovery"
+import (
+	"sync"
+
+	"github.com/dollarkillerx/light/discovery"
+)
 
 // Polling 轮训
 type Polling struct {
+	mu  sync.Mutex
 	ser []*discovery.Server
 	idx int
 }
@@ -16,6 +21,8 @@ func NewPolling() *Polling {
 }
 
 func (p *Polling) InitBalancing(sers []*discovery.Server) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.ser = sers
 }
 

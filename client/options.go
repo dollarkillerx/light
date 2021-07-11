@@ -22,6 +22,7 @@ type Options struct {
 	writeTimeout time.Duration
 	readTimeout  time.Duration
 	heartBeat    time.Duration
+	Trace        bool
 }
 
 func defaultOptions() *Options {
@@ -35,6 +36,7 @@ func defaultOptions() *Options {
 		writeTimeout:      time.Minute,
 		readTimeout:       time.Minute,
 		heartBeat:         time.Minute * 2,
+		Trace:             false,
 	}
 }
 
@@ -91,5 +93,11 @@ func SetHeartBeat(heartBeat time.Duration) Option {
 		if heartBeat > 0 {
 			options.heartBeat = heartBeat
 		}
+	}
+}
+
+func Trance() Option {
+	return func(options *Options) {
+		options.Trace = true
 	}
 }

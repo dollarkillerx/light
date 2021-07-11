@@ -45,11 +45,9 @@ func newService(server interface{}, serverName string, useName bool) (*service, 
 	}
 	ser.methodType = methods
 
-	log.Println("Registry Service")
 	for _, v := range methods {
 		log.Println("Registry Service: ", ser.name, "   method: ", v.method.Name)
 	}
-	log.Println("Registry Success")
 
 	return ser, nil
 }
