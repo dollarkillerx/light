@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 
+	"github.com/dollarkillerx/light"
 	"github.com/dollarkillerx/light/transport"
 	"github.com/dollarkillerx/light/utils"
 )
@@ -13,13 +14,67 @@ import (
 type Server struct {
 	serviceMap map[string]*service
 	options    *Options
+
+	beforeMiddleware     []MiddlewareFunc
+	afterMiddleware      []MiddlewareFunc
+	beforeMiddlewarePath map[string][]MiddlewareFunc
+	afterMiddlewarePath  map[string][]MiddlewareFunc
 }
 
 func NewServer() *Server {
 	return &Server{
 		serviceMap: map[string]*service{},
 		options:    defaultOptions(),
+
+		beforeMiddleware:     []MiddlewareFunc{},
+		afterMiddleware:      []MiddlewareFunc{},
+		beforeMiddlewarePath: map[string][]MiddlewareFunc{},
+		afterMiddlewarePath:  map[string][]MiddlewareFunc{},
 	}
+}
+
+type MiddlewareFunc func(ctx *light.Context, request interface{}, response interface{}) error
+
+func (s *Server) Before(beforeMiddleware ...MiddlewareFunc) {
+	if len(beforeMiddleware) <= 0 {
+		return
+	}
+	s.beforeMiddleware = append(s.beforeMiddleware, beforeMiddleware...)
+}
+
+func (s *Server) After(afterMiddleware ...MiddlewareFunc) {
+	if len(afterMiddleware) <= 0 {
+		return
+	}
+	s.afterMiddleware = append(s.afterMiddleware, afterMiddleware...)
+}
+
+// BeforePath 前置middleware  path: server_name.server_method
+func (s *Server) BeforePath(path string, beforeMiddleware ...MiddlewareFunc) {
+	if len(beforeMiddleware) <= 0 {
+		return
+	}
+	fn, ex := s.beforeMiddlewarePath[path]
+	if !ex {
+		fn = make([]MiddlewareFunc, 0)
+	}
+
+	fn = append(fn, beforeMiddleware...)
+	s.beforeMiddlewarePath[path] = fn
+}
+
+// AfterPath 后置middleware  path: server_name.server_method
+func (s *Server) AfterPath(path string, afterMiddleware ...MiddlewareFunc) {
+	if len(afterMiddleware) <= 0 {
+		return
+	}
+	fn, ex := s.afterMiddlewarePath[path]
+	if !ex {
+		fn = make([]MiddlewareFunc, 0)
+	}
+
+	fn = append(fn, afterMiddleware...)
+	s.afterMiddlewarePath[path] = fn
 }
 
 func (s *Server) Register(server interface{}) error {

@@ -34,5 +34,5 @@ LightRPC Multi-protocol encryption RPC
 - [x] Client connection pool
 - [x] Auth
 - [x] Discovery
-- [ ] Middleware
+- [x] Middleware
 - [ ] Performance Testing

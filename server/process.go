@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -230,10 +231,56 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 		return
 	}
 
+	// 前置middleware
+	if len(s.beforeMiddleware) != 0 {
+		for idx := range s.beforeMiddleware {
+			err := s.beforeMiddleware[idx](ctx, req, resp)
+			if err != nil {
+				return
+			}
+		}
+	}
+	path := fmt.Sprintf("%s.%s", msg.ServiceName, msg.ServiceMethod)
+	funcs, ex := s.beforeMiddlewarePath[path]
+	if ex {
+		if len(funcs) != 0 {
+			for idx := range funcs {
+				err := funcs[idx](ctx, req, resp)
+				if err != nil {
+					return
+				}
+			}
+		}
+	}
+
+	// 核心调用
 	callErr := ser.call(ctx, method, reflect.ValueOf(req), reflect.ValueOf(resp))
 	if callErr != nil {
 		ctx.SetValue("RespError", callErr.Error())
 	}
+
+	// 后置middleware
+	if len(s.afterMiddleware) != 0 {
+		for idx := range s.afterMiddleware {
+			err := s.afterMiddleware[idx](ctx, req, resp)
+			if err != nil {
+				return
+			}
+		}
+	}
+	funcs, ex = s.afterMiddlewarePath[path]
+	if ex {
+		if len(funcs) != 0 {
+			for idx := range funcs {
+				err := funcs[idx](ctx, req, resp)
+				if err != nil {
+					return
+				}
+			}
+		}
+	}
+	// response
+
 	// 1. 序列化
 	var respBody []byte
 	respBody, err = serialization.Encode(resp)
