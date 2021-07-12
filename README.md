@@ -16,7 +16,7 @@ LightRPC Multi-protocol encryption RPC
 ### Compress
 - [x] RawData
 - [x] Snappy
-- [ ] GZIP
+- [x] GZIP
 
 ### Discovery
 - [x] p2p
