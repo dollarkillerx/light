@@ -8,6 +8,7 @@ func init() {
 	// 初始化所有插件
 	CompressorManager.Register(RawData, &compressor_plugin.RawData{})
 	CompressorManager.Register(Snappy, &compressor_plugin.Snappy{})
+	CompressorManager.Register(GZIP, &compressor_plugin.GZIP{})
 }
 
 type CompressorType byte

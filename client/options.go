@@ -30,7 +30,7 @@ func defaultOptions() *Options {
 	return &Options{
 		pool:              25,
 		serializationType: codes.MsgPack,
-		compressorType:    codes.Snappy,
+		compressorType:    codes.GZIP,
 		loadBalancing:     load_banlancing.NewPolling(),
 		cryptology:        cryptology.AES,
 		aesKey:            []byte("58a95a8f804b49e686f651a0d3f6e631"),
