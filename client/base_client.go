@@ -105,10 +105,14 @@ func (b *BaseClient) reconnection() error {
 }
 
 func (b *BaseClient) Call(ctx *light.Context, serviceMethod string, request interface{}, response interface{}) (err error) {
+	now := time.Now()
 	defer func() {
 		if err := recover(); err != nil {
 			utils.PrintStack()
 			log.Println("Recover Err: ", err)
+		}
+		if b.options.Trace {
+			log.Printf("Call %s %s time: %d/mill", b.serverName, serviceMethod, time.Since(now).Milliseconds())
 		}
 	}() // 网络不可靠
 
@@ -131,6 +135,9 @@ func (b *BaseClient) Call(ctx *light.Context, serviceMethod string, request inte
 		timeout = b.options.readTimeout
 	}
 
+	if b.options.Trace {
+		log.Printf("Call %s %s  magic: %s", b.serverName, serviceMethod, magic)
+	}
 	// 调度
 	select {
 	case err, ex := <-respChan:
@@ -199,6 +206,15 @@ func (b *BaseClient) call(ctx *light.Context, serviceMethod string, request inte
 			b.conn.SetWriteDeadline(now.Add(b.options.writeTimeout))
 		}
 	}
+	// 写MAP
+	b.respInterRM.Lock()
+	b.respInterMap[magic] = &respMessage{
+		response: response,
+		ctx:      ctx,
+		respChan: respChan,
+	}
+	b.respInterRM.Unlock()
+
 	// 有点暴力呀 直接上锁
 	b.writeMu.Lock()
 	_, err = b.conn.Write(message)
@@ -215,15 +231,6 @@ func (b *BaseClient) call(ctx *light.Context, serviceMethod string, request inte
 		}
 		return "", errors.WithStack(err)
 	}
-
-	// 写MAP
-	b.respInterRM.Lock()
-	b.respInterMap[magic] = &respMessage{
-		response: response,
-		ctx:      ctx,
-		respChan: respChan,
-	}
-	b.respInterRM.Unlock()
 
 	return magic, nil
 }
