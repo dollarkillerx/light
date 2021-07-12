@@ -2,6 +2,7 @@ package client
 
 import (
 	"log"
+	"runtime"
 	"time"
 
 	"github.com/dollarkillerx/light/codes"
@@ -27,8 +28,12 @@ type Options struct {
 }
 
 func defaultOptions() *Options {
+	defaultPoolSize := runtime.NumCPU() * 4
+	if defaultPoolSize < 20 {
+		defaultPoolSize = 20
+	}
 	return &Options{
-		pool:              25,
+		pool:              defaultPoolSize,
 		serializationType: codes.MsgPack,
 		compressorType:    codes.GZIP,
 		loadBalancing:     load_banlancing.NewPolling(),

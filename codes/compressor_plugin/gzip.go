@@ -7,20 +7,9 @@ import (
 type GZIP struct{}
 
 func (G *GZIP) Zip(bytes []byte) ([]byte, error) {
-	zip, err := utils.Zip(bytes)
-	if err != nil {
-		panic(err)
-		return nil, err
-	}
-	return zip, err
+	return utils.Zip(bytes)
 }
 
 func (G *GZIP) Unzip(bytes []byte) ([]byte, error) {
-	unzip, err := utils.Unzip(bytes)
-	if err != nil {
-		panic(err)
-		return nil, err
-	}
-
-	return unzip, err
+	return utils.Unzip(bytes)
 }

@@ -20,6 +20,9 @@ import (
 	"go.uber.org/atomic"
 )
 
+var compressorMin = 10 << 20 // > 10M
+var compressorMax = 50 << 20 // < 50M 进行压缩
+
 type BaseClient struct {
 	conn       net.Conn
 	options    *Options
@@ -179,18 +182,25 @@ func (b *BaseClient) call(ctx *light.Context, serviceMethod string, request inte
 	if err != nil {
 		return "", err
 	}
-	// 1.3 压缩
-	metaDataBytes, err = b.compressor.Zip(metaDataBytes)
-	if err != nil {
-		return "", err
+
+	compressorType := b.options.compressorType
+	if len(metaDataBytes) > compressorMin && len(metaDataBytes) < compressorMax {
+		// 1.3 压缩
+		metaDataBytes, err = b.compressor.Zip(metaDataBytes)
+		if err != nil {
+			return "", err
+		}
+
+		requestBytes, err = b.compressor.Zip(requestBytes)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		compressorType = codes.RawData
 	}
 
-	requestBytes, err = b.compressor.Zip(requestBytes)
-	if err != nil {
-		return "", err
-	}
 	// 1.4 封装消息
-	magic, message, err := protocol.EncodeMessage("", serviceNameByte, serviceMethodByte, metaDataBytes, byte(protocol.Request), byte(b.options.compressorType), byte(b.options.serializationType), requestBytes)
+	magic, message, err := protocol.EncodeMessage("", serviceNameByte, serviceMethodByte, metaDataBytes, byte(protocol.Request), byte(compressorType), byte(b.options.serializationType), requestBytes)
 	if err != nil {
 		return "", err
 	}
@@ -331,12 +341,17 @@ func (b *BaseClient) processMessage() (magic string, respChan chan error, err er
 		return "", nil, nil
 	}
 
+	comp, ex := codes.CompressorManager.Get(codes.CompressorType(msg.Header.CompressorType))
+	if !ex {
+		return "", nil, nil
+	}
+
 	// 1. 解压缩
-	msg.MetaData, err = b.compressor.Unzip(msg.MetaData)
+	msg.MetaData, err = comp.Unzip(msg.MetaData)
 	if err != nil {
 		return "", nil, err
 	}
-	msg.Payload, err = b.compressor.Unzip(msg.Payload)
+	msg.Payload, err = comp.Unzip(msg.Payload)
 	if err != nil {
 		return "", nil, err
 	}

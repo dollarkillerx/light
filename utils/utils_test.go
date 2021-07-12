@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"testing"
 )
 
@@ -24,13 +23,13 @@ func TestGZIP(t *testing.T) {
 	rc := []byte("hello world")
 	zip, err := Zip(rc)
 	if err != nil {
-		log.Fatalln(err)
+		panic(err)
 		return
 	}
-
+	fmt.Println(zip)
 	unzip, err := Unzip(zip)
 	if err != nil {
-		log.Fatalln(err)
+		panic(err)
 	}
 	fmt.Println(string(unzip))
 }

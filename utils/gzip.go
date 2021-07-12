@@ -2,84 +2,45 @@ package utils
 
 import (
 	"bytes"
-	"compress/gzip"
-	"io/ioutil"
-	"sync"
-)
+	"io"
 
-// 来自RPCX
-var (
-	spWriter sync.Pool
-	spReader sync.Pool
-	spBuffer sync.Pool
+	gzip "github.com/klauspost/pgzip"
 )
-
-func init() {
-	spWriter = sync.Pool{New: func() interface{} {
-		return new(gzip.Writer)
-	}}
-	spReader = sync.Pool{New: func() interface{} {
-		return new(gzip.Reader)
-	}}
-	spBuffer = sync.Pool{New: func() interface{} {
-		return bytes.NewBuffer(nil)
-	}}
-}
 
 // Unzip unzips data.
 func Unzip(data []byte) ([]byte, error) {
-	buf := spBuffer.Get().(*bytes.Buffer)
-	defer func() {
-		buf.Reset()
-		spBuffer.Put(buf)
-	}()
-
+	var buf bytes.Buffer
 	_, err := buf.Write(data)
 	if err != nil {
 		return nil, err
 	}
-
-	gr := spReader.Get().(*gzip.Reader)
-	defer func() {
-		spReader.Put(gr)
-	}()
-	err = gr.Reset(buf)
+	reader, err := gzip.NewReader(&buf)
 	if err != nil {
 		return nil, err
 	}
-	defer gr.Close()
+	defer reader.Close()
 
-	data, err = ioutil.ReadAll(gr)
+	buffer := bytes.NewBuffer(nil)
+	_, err = io.Copy(buffer, reader)
 	if err != nil {
 		return nil, err
 	}
-	return data, err
+
+	return buffer.Bytes(), nil
 }
 
 // Zip zips data.
 func Zip(data []byte) ([]byte, error) {
-	buf := spBuffer.Get().(*bytes.Buffer)
-	w := spWriter.Get().(*gzip.Writer)
-	w.Reset(buf)
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	_, err := gw.Write(data)
+	if err != nil {
+		return nil, err
+	}
+	err = gw.Close()
+	if err != nil {
+		return nil, err
+	}
 
-	defer func() {
-		buf.Reset()
-		spBuffer.Put(buf)
-		w.Close()
-		spWriter.Put(w)
-	}()
-	_, err := w.Write(data)
-	if err != nil {
-		return nil, err
-	}
-	err = w.Flush()
-	if err != nil {
-		return nil, err
-	}
-	err = w.Close()
-	if err != nil {
-		return nil, err
-	}
-	dec := buf.Bytes()
-	return dec, nil
+	return buf.Bytes(), nil
 }
