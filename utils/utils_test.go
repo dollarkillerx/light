@@ -18,18 +18,3 @@ func TestIsPublic(t *testing.T) {
 func TestDisID(t *testing.T) {
 	fmt.Println(DistributedID())
 }
-
-func TestGZIP(t *testing.T) {
-	rc := []byte("hello world")
-	zip, err := Zip(rc)
-	if err != nil {
-		panic(err)
-		return
-	}
-	fmt.Println(zip)
-	unzip, err := Unzip(zip)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(string(unzip))
-}

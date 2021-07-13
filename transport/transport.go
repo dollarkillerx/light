@@ -58,6 +58,7 @@ const (
 	TCP  Protocol = "tcp"
 	KCP  Protocol = "kcp"
 	MQTT Protocol = "mqtt"
+	UNIX Protocol = "unix"
 )
 
 func (p Protocol) String() string {

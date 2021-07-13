@@ -112,6 +112,11 @@ func (s *Server) Run(options ...Option) error {
 		if err != nil {
 			return err
 		}
+	case transport.UNIX:
+		s.options.nl, err = transport.Transport.Gen(transport.UNIX, s.options.Uri)
+		if err != nil {
+			return err
+		}
 	default:
 		return errors.New(fmt.Sprintf("%s not funod", s.options.Protocol))
 	}

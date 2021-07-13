@@ -59,6 +59,13 @@ func UseTCP(host string) Option {
 	}
 }
 
+func UseUnix(addr string) Option {
+	return func(options *Options) {
+		options.Uri = addr
+		options.Protocol = transport.UNIX
+	}
+}
+
 func UseKCP(host string) Option {
 	return func(options *Options) {
 		options.Uri = host
