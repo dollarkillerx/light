@@ -53,10 +53,12 @@ func (c *connectPool) Get(ctx context.Context) (LightClient, error) {
 	case <-ctx.Done():
 		return nil, errors.New("pool get timeout")
 	case r := <-c.pool:
+		fmt.Println(len(c.pool))
 		return r, nil
 	}
 }
 
 func (c *connectPool) Put(client LightClient) {
+	fmt.Println(len(c.pool))
 	c.pool <- client
 }

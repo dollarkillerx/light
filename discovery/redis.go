@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -18,6 +19,7 @@ type RedisDiscovery struct {
 	close    chan struct{}
 
 	ser *Server
+	mu  sync.Mutex
 }
 
 func NewRedisDiscovery(addr string, hearBeat uint, auth *string) (*RedisDiscovery, error) {
@@ -61,6 +63,8 @@ func NewRedisDiscovery(addr string, hearBeat uint, auth *string) (*RedisDiscover
 }
 
 func (r *RedisDiscovery) Discovery(serName string) ([]*Server, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	path := fmt.Sprintf("/registry/%s/*", serName)
 	red := r.pool.Get()
 	defer red.Close()

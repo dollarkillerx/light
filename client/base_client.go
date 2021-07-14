@@ -49,7 +49,10 @@ type respMessage struct {
 }
 
 func newBaseClient(serverName string, options *Options) (*BaseClient, error) {
-	service := options.loadBalancing.GetService()
+	service, err := options.loadBalancing.GetService()
+	if err != nil {
+		return nil, err
+	}
 	con, err := transport.Client.Gen(service.Protocol, service.Addr)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -122,7 +125,10 @@ func (b *BaseClient) reconnection() error {
 	}
 
 	b.options.loadBalancing.InitBalancing(discovery)
-	service := b.options.loadBalancing.GetService()
+	service, err := b.options.loadBalancing.GetService()
+	if err != nil {
+		return err
+	}
 	con, err := transport.Client.Gen(service.Protocol, service.Addr)
 	if err != nil {
 		return errors.WithStack(err)
@@ -296,11 +302,15 @@ func (b *BaseClient) call(ctx *light.Context, serviceMethod string, request inte
 		if b.options.Trace {
 			log.Println(err)
 		}
-		if strings.Contains(err.Error(), "broken pipe") {
-			er := b.reconnection()
-			if er != nil {
-				log.Println("Reconnection Error: ", er)
-			}
+		//if strings.Contains(err.Error(), "broken pipe") || strings.Contains(err.Error(), "network") {
+		//	er := b.reconnection()
+		//	if er != nil {
+		//		log.Println("Reconnection Error: ", er)
+		//	}
+		//}
+		er := b.reconnection()
+		if er != nil {
+			log.Println("Reconnection Error: ", er)
 		}
 		return "", errors.WithStack(err)
 	}
@@ -329,7 +339,11 @@ func (b *BaseClient) heartBeat() {
 		_, err = b.conn.Write(i)
 		b.writeMu.Unlock()
 		if err != nil {
-			go b.reconnection()
+			err := b.reconnection()
+			if err != nil {
+				log.Println(err)
+				return
+			}
 			break
 		}
 		time.Sleep(b.options.heartBeat)

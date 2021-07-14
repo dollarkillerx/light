@@ -12,6 +12,7 @@ import (
 	"github.com/dollarkillerx/light"
 	"github.com/dollarkillerx/light/codes"
 	"github.com/dollarkillerx/light/cryptology"
+	"github.com/dollarkillerx/light/pkg"
 	"github.com/dollarkillerx/light/protocol"
 	"github.com/dollarkillerx/light/utils"
 )
@@ -101,7 +102,7 @@ func (s *Server) process(conn net.Conn) {
 	// limit 限流
 	if s.options.Discovery.Limit() {
 		// 熔断
-		encodeHandshake := protocol.EncodeHandshake([]byte(""), []byte(""), []byte("circuit breaker"))
+		encodeHandshake := protocol.EncodeHandshake([]byte(""), []byte(""), []byte(pkg.ErrCircuitBreaker.Error()))
 		conn.Write(encodeHandshake)
 		return
 	}
@@ -172,7 +173,9 @@ loop:
 
 func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message, addr string, aesKey []byte) {
 	var err error
+	s.options.Discovery.Add(1)
 	defer func() {
+		s.options.Discovery.Less(1)
 		if err != nil {
 			if s.options.Trace {
 				log.Println("ProcessResponse Error: ", err, "  ID: ", addr)
@@ -198,6 +201,34 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 		if err != nil {
 			return
 		}
+
+		return
+	}
+
+	// 限流
+	if s.options.Discovery.Limit() {
+		serialization, _ := codes.SerializationManager.Get(codes.MsgPack)
+		metaData := make(map[string]string)
+		metaData["RespError"] = pkg.ErrCircuitBreaker.Error()
+		meta, err := serialization.Encode(metaData)
+		if err != nil {
+			return
+		}
+		decrypt, err := cryptology.AESDecrypt(aesKey, meta)
+		if err != nil {
+			return
+		}
+		_, message, err := protocol.EncodeMessage(msg.MagicNumber, []byte(msg.ServiceName), []byte(msg.ServiceMethod), decrypt, byte(protocol.Response), byte(codes.RawData), byte(codes.MsgPack), []byte(""))
+		if err != nil {
+			return
+		}
+		// 5. 回写
+		err = xChannel.Send(message)
+		if err != nil {
+			return
+		}
+
+		log.Println("限流/////////////")
 
 		return
 	}

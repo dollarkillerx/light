@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"time"
 
 	"github.com/dollarkillerx/light"
 	"github.com/dollarkillerx/light/client"
@@ -18,6 +18,8 @@ type MethodTestResp struct {
 }
 
 func main() {
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
+
 	redisDiscovery, err := discovery.NewRedisDiscovery("127.0.0.1:6379", 10, nil)
 	if err != nil {
 		log.Fatalln(err)
@@ -30,18 +32,28 @@ func main() {
 		return
 	}
 
-	req := MethodTestReq{
-		Name: "hello",
-	}
-	resp := MethodTestResp{}
-	err = connect.Call(light.DefaultCtx(), "HelloWorld", &req, &resp)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	fmt.Println(resp)
-
+	li := make(chan struct{}, 1)
 	for {
-		select {}
+		li <- struct{}{}
+		go func() {
+			defer func() {
+				<-li
+			}()
+
+			req := MethodTestReq{
+				Name: "hello",
+			}
+			resp := MethodTestResp{}
+			err = connect.Call(light.DefaultCtx(), "HelloWorld", &req, &resp)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			log.Println(resp)
+		}()
+
+		time.Sleep(time.Millisecond * 10)
 	}
+
 }
