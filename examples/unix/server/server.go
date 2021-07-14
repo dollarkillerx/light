@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -15,7 +16,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if err := ser.Run(server.UseUnix("./unix.sock")); err != nil {
+	if err := ser.Run(server.UseUnix("./unix.sock"), server.SetContext(context.Background())); err != nil {
 		log.Fatalln(err)
 	}
 }

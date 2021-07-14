@@ -9,13 +9,14 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	ser := server.NewServer()
 	err := ser.RegisterName(&HelloWorld{}, "helloworld")
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	if err := ser.Run(server.UseTCP("0.0.0.0:8074"), server.Trace(), server.SetAESCryptology([]byte("58a95a8f804b49e686f651a0d3f6e631"))); err != nil {
+	if err := ser.Run(server.UseTCP("0.0.0.0:8074"), server.Trace()); err != nil {
 		log.Fatalln(err)
 	}
 }

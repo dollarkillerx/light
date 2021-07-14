@@ -3,10 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
-
 	"github.com/dollarkillerx/light"
 	"github.com/dollarkillerx/light/server"
+	"log"
 )
 
 func main() {
@@ -16,7 +15,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if err := ser.Run(server.UseTCP("0.0.0.0:8074"), server.Trace(), server.SetAUTH(authFunc)); err != nil {
+	if err := ser.Run(server.UseTCP("0.0.0.0:8074"), server.SetAUTH(authFunc)); err != nil {
 		log.Fatalln(err)
 	}
 }

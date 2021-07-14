@@ -23,10 +23,30 @@ func NewSimplePeerToPeer(addr string, protocol transport.Protocol) *SimplePeerTo
 	}
 }
 
-func (s *SimplePeerToPeer) Registry(serName, addr string, weights float64, protocol transport.Protocol, serID *string) error {
+func (s *SimplePeerToPeer) Registry(serName, addr string, weights float64, protocol transport.Protocol, maximumLoad int64, serID *string) error {
+	s.ser = &Server{
+		ServerName:  serName,
+		Addr:        addr,
+		ID:          *serID,
+		Weights:     weights,
+		Protocol:    protocol,
+		MaximumLoad: maximumLoad,
+	}
 	return nil
 }
 
 func (s *SimplePeerToPeer) UnRegistry(serName string, serID string) error {
 	return nil
+}
+
+func (s *SimplePeerToPeer) Add(load int64) {
+	return
+}
+
+func (s *SimplePeerToPeer) Less(load int64) {
+	return
+}
+
+func (s *SimplePeerToPeer) Limit() bool {
+	return false
 }

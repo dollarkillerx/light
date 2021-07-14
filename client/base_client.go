@@ -16,6 +16,7 @@ import (
 	"github.com/dollarkillerx/light/protocol"
 	"github.com/dollarkillerx/light/transport"
 	"github.com/dollarkillerx/light/utils"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 )
@@ -48,7 +49,6 @@ type respMessage struct {
 }
 
 func newBaseClient(serverName string, options *Options) (*BaseClient, error) {
-
 	service := options.loadBalancing.GetService()
 	con, err := transport.Client.Gen(service.Protocol, service.Addr)
 	if err != nil {
@@ -65,16 +65,47 @@ func newBaseClient(serverName string, options *Options) (*BaseClient, error) {
 		return nil, pkg.ErrCompressor404
 	}
 
+	// 握手
+	encrypt, err := cryptology.RsaEncrypt([]byte(options.AUTH), options.rsaPublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	aesKey := []byte(strings.ReplaceAll(uuid.New().String(), "-", ""))
+
+	aesKey2, err := cryptology.RsaEncrypt(aesKey, options.rsaPublicKey)
+	if err != nil {
+		return nil, err
+	}
+	handshake := protocol.EncodeHandshake(aesKey2, encrypt, []byte(""))
+	_, err = con.Write(handshake)
+	if err != nil {
+		con.Close()
+		return nil, err
+	}
+
+	hsk := &protocol.Handshake{}
+	err = hsk.Handshake(con)
+	if err != nil {
+		con.Close()
+		return nil, err
+	}
+	if hsk.Error != nil && len(hsk.Error) > 0 {
+		con.Close()
+		err := string(hsk.Error)
+		return nil, errors.New(err)
+	}
+
 	bc := &BaseClient{
 		serverName:         serverName,
 		conn:               con,
 		options:            options,
 		serialization:      serialization,
 		compressor:         compressor,
-		aesKey:             options.aesKey,
 		respInterMap:       map[string]*respMessage{},
 		heartBeatMark:      atomic.Bool{},
 		processMessageMark: atomic.Bool{},
+		aesKey:             aesKey,
 	}
 
 	go bc.heartBeat()
@@ -99,8 +130,40 @@ func (b *BaseClient) reconnection() error {
 
 	b.writeMu.Lock()
 	defer b.writeMu.Unlock()
+	b.conn.Close() // 回收
 
 	b.conn = con
+
+	encrypt, err := cryptology.RsaEncrypt([]byte(b.options.AUTH), b.options.rsaPublicKey)
+	if err != nil {
+		return err
+	}
+
+	aesKey := []byte(strings.ReplaceAll(uuid.New().String(), "-", ""))
+
+	aesKey2, err := cryptology.RsaEncrypt(aesKey, b.options.rsaPublicKey)
+	if err != nil {
+		return err
+	}
+	handshake := protocol.EncodeHandshake(aesKey2, encrypt, []byte(""))
+	_, err = con.Write(handshake)
+	if err != nil {
+		con.Close()
+		return err
+	}
+
+	hsk := &protocol.Handshake{}
+	err = hsk.Handshake(con)
+	if err != nil {
+		con.Close()
+		return err
+	}
+	if hsk.Error != nil && len(hsk.Error) > 0 {
+		con.Close()
+		err := string(hsk.Error)
+		return errors.New(err)
+	}
+
 	go b.heartBeat()
 	go b.processMessageManager()
 	fmt.Println("Reconnection SUCCESS")
@@ -266,7 +329,6 @@ func (b *BaseClient) heartBeat() {
 		_, err = b.conn.Write(i)
 		b.writeMu.Unlock()
 		if err != nil {
-			log.Println(err)
 			go b.reconnection()
 			break
 		}
@@ -356,7 +418,7 @@ func (b *BaseClient) processMessage() (magic string, respChan chan error, err er
 		return "", nil, err
 	}
 	// 2. 解密
-	msg.MetaData, err = cryptology.AESDecrypt(b.options.aesKey, msg.MetaData)
+	msg.MetaData, err = cryptology.AESDecrypt(b.aesKey, msg.MetaData)
 	if err != nil {
 		if len(msg.MetaData) != 0 {
 			return "", nil, err
@@ -364,7 +426,7 @@ func (b *BaseClient) processMessage() (magic string, respChan chan error, err er
 		msg.Payload = []byte("")
 	}
 
-	msg.Payload, err = cryptology.AESDecrypt(b.options.aesKey, msg.Payload)
+	msg.Payload, err = cryptology.AESDecrypt(b.aesKey, msg.Payload)
 	if err != nil {
 		if len(msg.Payload) != 0 {
 			return "", nil, err

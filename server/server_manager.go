@@ -1,8 +1,6 @@
 package server
 
 import (
-	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 
@@ -101,24 +99,9 @@ func (s *Server) Run(options ...Option) error {
 	}
 
 	var err error
-	switch s.options.Protocol {
-	case transport.KCP:
-		s.options.nl, err = transport.Transport.Gen(transport.KCP, s.options.Uri)
-		if err != nil {
-			return err
-		}
-	case transport.TCP:
-		s.options.nl, err = transport.Transport.Gen(transport.TCP, s.options.Uri)
-		if err != nil {
-			return err
-		}
-	case transport.UNIX:
-		s.options.nl, err = transport.Transport.Gen(transport.UNIX, s.options.Uri)
-		if err != nil {
-			return err
-		}
-	default:
-		return errors.New(fmt.Sprintf("%s not funod", s.options.Protocol))
+	s.options.nl, err = transport.Transport.Gen(s.options.Protocol, s.options.Uri)
+	if err != nil {
+		return err
 	}
 
 	log.Printf("LightRPC: %s  %s \n", s.options.Protocol, s.options.Uri)
@@ -135,7 +118,7 @@ func (s *Server) Run(options ...Option) error {
 		// 进行服务注册
 		sId := string(sIdb)
 		for k := range s.serviceMap {
-			err := s.options.Discovery.Registry(k, s.options.registryAddr, s.options.weights, s.options.Protocol, &sId)
+			err := s.options.Discovery.Registry(k, s.options.registryAddr, s.options.weights, s.options.Protocol, s.options.MaximumLoad, &sId)
 			if err != nil {
 				return err
 			}
@@ -162,6 +145,7 @@ loop:
 			if s.options.Trace {
 				log.Println("connect: ", accept.RemoteAddr())
 			}
+
 			go s.process(accept)
 		}
 

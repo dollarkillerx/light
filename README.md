@@ -36,4 +36,5 @@ LightRPC Multi-protocol encryption RPC
 - [x] Auth
 - [x] Discovery
 - [x] Middleware
+- [x] Limit
 - [x] [Performance Testing](https://github.com/dollarkillerx/light_rpc_benchmark)

@@ -59,3 +59,11 @@ func (c *Context) GetTimeout() time.Duration {
 	}
 	return i.(time.Duration)
 }
+
+func (c *Context) GetPath() string {
+	return c.metaData["light_path"]
+}
+
+func (c *Context) SetPath(path string) {
+	c.metaData["light_path"] = path
+}

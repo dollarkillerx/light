@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"log"
 	"net"
 	"time"
 
@@ -26,11 +25,13 @@ type Options struct {
 	writeTimeout    time.Duration
 	processChanSize int
 
-	AesKey       []byte
-	AuthFunc     AuthFunc
-	Discovery    discovery.Discovery
-	registryAddr string
-	weights      float64
+	MaximumLoad   int64
+	RSAPublicKey  []byte
+	RSAPrivateKey []byte
+	AuthFunc      AuthFunc
+	Discovery     discovery.Discovery
+	registryAddr  string
+	weights       float64
 }
 
 func defaultOptions() *Options {
@@ -46,7 +47,28 @@ func defaultOptions() *Options {
 		},
 		processChanSize: 1000,
 		Trace:           false,
-		AesKey:          []byte("58a95a8f804b49e686f651a0d3f6e631"),
+		RSAPublicKey: []byte(`-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDWviNW8C1f+cjy8KF0qT93AA1q
+lbQTXPKO4qm34bf6UnSpXgemm1zTEgcPu5Ifka2GgTEgeUMD//iwxr3BTNYA0ARc
+soVSN53vklXJqRL3xMWNUFg/2bsAZn5Irlw1xRZfzFzqyCDk5JvUCejvHjvjQwOH
+YGHsCfV0pvxPlwFq4wIDAQAB
+-----END PUBLIC KEY-----`),
+		RSAPrivateKey: []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIICXgIBAAKBgQDWviNW8C1f+cjy8KF0qT93AA1qlbQTXPKO4qm34bf6UnSpXgem
+m1zTEgcPu5Ifka2GgTEgeUMD//iwxr3BTNYA0ARcsoVSN53vklXJqRL3xMWNUFg/
+2bsAZn5Irlw1xRZfzFzqyCDk5JvUCejvHjvjQwOHYGHsCfV0pvxPlwFq4wIDAQAB
+AoGBAJWh07omjVeNE8rEhZxmuoRPEwor2liLsbCCnEQ3Eh1pC0Vg8e/T3jBtJWJ/
+DujUd5d7uiGonVvSJxX2xg5FXe/Xo2bkDL98+mL2MrSBajLR0wB8WcWPpfhvblwJ
+n9SEfWjCZdPQQdm6+tGkJaSLFoCDRVkkO4pijaX+S0VWT+kBAkEA3HwftjDw+xHQ
+WDkO/pVRU7OVLdBmukaU5itx2SwKoMta7J1MQe0z1Y2gnZhwkL1NeMoYXuul0wMT
+7JR2vMikIwJBAPlVO4rbSIbzKL4Zkx8C9SjvJ57kFqU/kRvwg6nVLCNIzaVDphG/
+E8v+jo8KoSX7Gyf0xR1xZMcQSbjF2Wd2KkECQEikPG5yQXL2s4Xdhqsp1tmU2Rl3
+B+FnT7dlqOS8NeQ0G4jJak5uMB2zw68ogi2tsNCTBOSBDukuomnXoCcik7ECQQDO
+HUCQpIALVz4qEHhHnalPQozNVB7IUolBwI0HO3s2W/vsj8TcTMovy+rLouzeufuU
+B0tf8Jpv2S4oeh4j4lJBAkEAgykTI0fVKxt9yl4p/xcrLBgs0IBaeC+VolyMBc3H
+TT0p2Vmye/dE/9DmugwURhalDEywX7EO0THHr2hg0zhVEQ==
+-----END RSA PRIVATE KEY-----`),
+		Discovery: &discovery.SimplePeerToPeer{},
 	}
 }
 
@@ -108,14 +130,10 @@ func Trace() Option {
 	}
 }
 
-func SetAESCryptology(key []byte) Option {
-	if len(key) != 32 && len(key) != 16 {
-		log.Fatalln("AES KEY LEN == 32 OR == 16")
-	}
-
+func SetRSAKey(publicKey []byte, privateKey []byte) Option {
 	return func(options *Options) {
-		//options.AesKey = cryptology.AES
-		options.AesKey = key
+		options.RSAPublicKey = publicKey
+		options.RSAPrivateKey = privateKey
 	}
 }
 
@@ -126,10 +144,11 @@ func SetAUTH(auth AuthFunc) Option {
 }
 
 // SetDiscovery discovery, addr 注册本服务地址
-func SetDiscovery(discovery discovery.Discovery, addr string, weights float64) Option {
+func SetDiscovery(discovery discovery.Discovery, addr string, weights float64, maximumLoad int64) Option {
 	return func(options *Options) {
 		options.Discovery = discovery
 		options.registryAddr = addr
 		options.weights = weights
+		options.MaximumLoad = maximumLoad
 	}
 }

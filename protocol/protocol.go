@@ -3,9 +3,11 @@ package protocol
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/rs/xid"
 	"hash/crc32"
 	"io"
+	"log"
+
+	"github.com/rs/xid"
 )
 
 type RequestType byte
@@ -72,6 +74,7 @@ func (m *Protocol) IODecode(r io.Reader) (*Message, error) {
 	}
 
 	if headerByte[0] != LightSt {
+		log.Println(headerByte)
 		return nil, errors.New("NO Light")
 	}
 
@@ -222,4 +225,94 @@ func EncodeMessage(magicStr string, server, method, metaData []byte, respType, c
 	}
 
 	return string(magicNumber), buf, nil
+}
+
+const LightHandshakeSt = 0x09 // Handshake 起始符
+
+/**
+	Handshake 协议设计
+	起始符 :  keySize  :  tokenSize :  errorSize :  key  : token :  err :
+    0x09  :     4     :     4      :    4       :   xxx  :  xxx  :  xxx :
+*/
+
+type Handshake struct {
+	Key   []byte
+	Token []byte
+	Error []byte
+}
+
+// EncodeHandshake 编码握手函数
+func EncodeHandshake(key, token, err []byte) []byte {
+	buf := make([]byte, 13+len(key)+len(token)+len(err))
+
+	buf[0] = LightHandshakeSt
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(len(key)))
+	binary.LittleEndian.PutUint32(buf[5:9], uint32(len(token)))
+	binary.LittleEndian.PutUint32(buf[9:13], uint32(len(err)))
+
+	st := 13
+	endI := st + len(key)
+	copy(buf[st:endI], key)
+
+	st = endI
+	endI = st + len(token)
+	copy(buf[st:endI], token)
+
+	st = endI
+	endI = st + len(err)
+	copy(buf[st:endI], err)
+
+	return buf
+}
+
+// Handshake 解码握手函数
+func (h *Handshake) Handshake(r io.Reader) error {
+	headerByte := make([]byte, 13)
+
+	// 读取标志位
+	_, err := io.ReadFull(r, headerByte[:1])
+	if err != nil {
+		return err
+	}
+
+	if headerByte[0] != LightHandshakeSt {
+		return errors.New("NO Light Handshake")
+	}
+
+	// 读取剩下的
+	_, err = io.ReadFull(r, headerByte[1:])
+	if err != nil {
+		return err
+	}
+
+	// 解析头
+	keySize := binary.LittleEndian.Uint32(headerByte[1:5])
+	tokenSize := binary.LittleEndian.Uint32(headerByte[5:9])
+	errorSize := binary.LittleEndian.Uint32(headerByte[9:13])
+
+	bodyData := make([]byte, keySize+tokenSize+errorSize)
+	_, err = io.ReadFull(r, bodyData)
+	if err != nil {
+		return err
+	}
+
+	var st uint32 = 0
+	endIdx := keySize
+	key := make([]byte, keySize)
+	copy(key, bodyData[st:endIdx])
+	h.Key = key
+
+	st = endIdx
+	endIdx = st + tokenSize
+	token := make([]byte, tokenSize)
+	copy(token, bodyData[st:endIdx])
+	h.Token = token
+
+	st = endIdx
+	endIdx = st + errorSize
+	errStr := make([]byte, errorSize)
+	copy(errStr, bodyData[st:endIdx])
+	h.Error = errStr
+
+	return nil
 }

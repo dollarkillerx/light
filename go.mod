@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/golang/snappy v0.0.4
 	github.com/gomodule/redigo v1.8.5
+	github.com/google/uuid v1.3.0
 	github.com/klauspost/compress v1.13.1 // indirect
 	github.com/klauspost/pgzip v1.2.5
 	github.com/klauspost/reedsolomon v1.9.12 // indirect

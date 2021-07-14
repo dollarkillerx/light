@@ -17,6 +17,7 @@ import (
 )
 
 func (s *Server) process(conn net.Conn) {
+
 	defer func() {
 		// 网络不可靠
 		if err := recover(); err != nil {
@@ -25,12 +26,18 @@ func (s *Server) process(conn net.Conn) {
 		}
 	}()
 
+	s.options.Discovery.Add(1)
 	defer func() {
+		s.options.Discovery.Less(1)
 		// 退出 回收句柄
 		err := conn.Close()
 		if err != nil {
 			log.Println(err)
 			return
+		}
+
+		if s.options.Trace {
+			log.Println("close connect: ", conn.RemoteAddr())
 		}
 	}()
 
@@ -54,6 +61,56 @@ func (s *Server) process(conn net.Conn) {
 	}
 
 	xChannel := utils.NewXChannel(s.options.processChanSize)
+
+	// 握手
+	handshake := protocol.Handshake{}
+	err := handshake.Handshake(conn)
+	if err != nil {
+		return
+	}
+
+	aesKey, err := cryptology.RsaDecrypt(handshake.Key, s.options.RSAPrivateKey)
+	if err != nil {
+		encodeHandshake := protocol.EncodeHandshake([]byte(""), []byte(""), []byte(err.Error()))
+		conn.Write(encodeHandshake)
+		return
+	}
+
+	if len(aesKey) != 32 && len(aesKey) != 16 {
+		encodeHandshake := protocol.EncodeHandshake([]byte(""), []byte(""), []byte("aes key != 32 && key != 16"))
+		conn.Write(encodeHandshake)
+		return
+	}
+
+	token, err := cryptology.RsaDecrypt(handshake.Token, s.options.RSAPrivateKey)
+	if err != nil {
+		encodeHandshake := protocol.EncodeHandshake([]byte(""), []byte(""), []byte(err.Error()))
+		conn.Write(encodeHandshake)
+		return
+	}
+
+	if s.options.AuthFunc != nil {
+		err := s.options.AuthFunc(light.DefaultCtx(), string(token))
+		if err != nil {
+			encodeHandshake := protocol.EncodeHandshake([]byte(""), []byte(""), []byte(err.Error()))
+			conn.Write(encodeHandshake)
+			return
+		}
+	}
+
+	// limit 限流
+	if s.options.Discovery.Limit() {
+		// 熔断
+		encodeHandshake := protocol.EncodeHandshake([]byte(""), []byte(""), []byte("circuit breaker"))
+		conn.Write(encodeHandshake)
+		return
+	}
+
+	encodeHandshake := protocol.EncodeHandshake([]byte(""), []byte(""), []byte(""))
+	_, err = conn.Write(encodeHandshake)
+	if err != nil {
+		return
+	}
 	// send
 	go func() {
 	loop:
@@ -109,11 +166,11 @@ loop:
 			break loop
 		}
 
-		go s.processResponse(xChannel, msg, conn.RemoteAddr().String())
+		go s.processResponse(xChannel, msg, conn.RemoteAddr().String(), aesKey)
 	}
 }
 
-func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message, addr string) {
+func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message, addr string, aesKey []byte) {
 	var err error
 	defer func() {
 		if err != nil {
@@ -161,12 +218,12 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 		return
 	}
 	// 2. 解密
-	msg.MetaData, err = cryptology.AESDecrypt(s.options.AesKey, msg.MetaData)
+	msg.MetaData, err = cryptology.AESDecrypt(aesKey, msg.MetaData)
 	if err != nil {
 		return
 	}
 
-	msg.Payload, err = cryptology.AESDecrypt(s.options.AesKey, msg.Payload)
+	msg.Payload, err = cryptology.AESDecrypt(aesKey, msg.Payload)
 	if err != nil {
 		return
 	}
@@ -189,13 +246,13 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 
 	// 1.3 auth
 	if s.options.AuthFunc != nil {
-		auth := metaData["AUTH"]
+		auth := metaData["Light_AUTH"]
 		err := s.options.AuthFunc(ctx, auth)
 		if err != nil {
 			ctx.SetValue("RespError", err.Error())
 			var metaDataByte []byte
 			metaDataByte, _ = serialization.Encode(ctx.GetMetaData())
-			metaDataByte, _ = cryptology.AESEncrypt(s.options.AesKey, metaDataByte)
+			metaDataByte, _ = cryptology.AESEncrypt(aesKey, metaDataByte)
 			metaDataByte, _ = compressor.Zip(metaDataByte)
 			// 4. 打包
 			_, message, err := protocol.EncodeMessage(msg.MagicNumber, []byte(msg.ServiceName), []byte(msg.ServiceMethod), metaDataByte, byte(protocol.Response), msg.Header.CompressorType, msg.Header.SerializationType, []byte(""))
@@ -231,6 +288,9 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 		return
 	}
 
+	path := fmt.Sprintf("%s.%s", msg.ServiceName, msg.ServiceMethod)
+	ctx.SetPath(path)
+
 	// 前置middleware
 	if len(s.beforeMiddleware) != 0 {
 		for idx := range s.beforeMiddleware {
@@ -240,7 +300,6 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 			}
 		}
 	}
-	path := fmt.Sprintf("%s.%s", msg.ServiceName, msg.ServiceMethod)
 	funcs, ex := s.beforeMiddlewarePath[path]
 	if ex {
 		if len(funcs) != 0 {
@@ -288,11 +347,11 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 	var metaDataByte []byte
 	metaDataByte, _ = serialization.Encode(ctx.GetMetaData())
 	// 2. 加密
-	metaDataByte, err = cryptology.AESEncrypt(s.options.AesKey, metaDataByte)
+	metaDataByte, err = cryptology.AESEncrypt(aesKey, metaDataByte)
 	if err != nil {
 		return
 	}
-	respBody, err = cryptology.AESEncrypt(s.options.AesKey, respBody)
+	respBody, err = cryptology.AESEncrypt(aesKey, respBody)
 	if err != nil {
 		return
 	}

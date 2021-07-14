@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/dollarkillerx/light/transport"
@@ -15,6 +16,8 @@ type RedisDiscovery struct {
 	hearBeat uint // sec
 	pool     *redis.Pool
 	close    chan struct{}
+
+	ser *Server
 }
 
 func NewRedisDiscovery(addr string, hearBeat uint, auth *string) (*RedisDiscovery, error) {
@@ -88,7 +91,7 @@ func (r *RedisDiscovery) Discovery(serName string) ([]*Server, error) {
 	return sers, nil
 }
 
-func (r *RedisDiscovery) Registry(serName, addr string, weights float64, protocol transport.Protocol, serID *string) error {
+func (r *RedisDiscovery) Registry(serName, addr string, weights float64, protocol transport.Protocol, maximumLoad int64, serID *string) error {
 	if serID == nil {
 		id, err := utils.DistributedID()
 		if err != nil {
@@ -97,19 +100,17 @@ func (r *RedisDiscovery) Registry(serName, addr string, weights float64, protoco
 		serID = &id
 	}
 
-	serVer := Server{
-		Addr:     addr,
-		ID:       *serID,
-		Weights:  weights,
-		Protocol: protocol,
+	r.ser = &Server{
+		ServerName:  serName,
+		Addr:        addr,
+		ID:          *serID,
+		Weights:     weights,
+		Protocol:    protocol,
+		MaximumLoad: maximumLoad,
 	}
 
-	serNode, err := json.Marshal(serVer)
-	if err != nil {
-		return err
-	}
 	path := r.getRedisPath(serName, *serID)
-	err = r.registry(path, serNode)
+	err := r.registry(path)
 	if err != nil {
 		return err
 	}
@@ -119,7 +120,7 @@ func (r *RedisDiscovery) Registry(serName, addr string, weights float64, protoco
 			case <-r.close:
 				return
 			case <-time.After(time.Second * time.Duration(r.hearBeat)):
-				err = r.registry(path, serNode)
+				err = r.registry(path)
 				if err != nil {
 					log.Println(err)
 				}
@@ -130,11 +131,16 @@ func (r *RedisDiscovery) Registry(serName, addr string, weights float64, protoco
 	return nil
 }
 
-func (r *RedisDiscovery) registry(path string, byte []byte) error {
+func (r *RedisDiscovery) registry(path string) error {
 	rds := r.pool.Get()
 	defer rds.Close()
 
-	_, err := rds.Do("setex", path, r.hearBeat, byte)
+	byt, err := json.Marshal(r.ser)
+	if err != nil {
+		return err
+	}
+
+	_, err = rds.Do("setex", path, r.hearBeat, byt)
 	return err
 }
 
@@ -146,4 +152,23 @@ func (r *RedisDiscovery) UnRegistry(serName string, serID string) error {
 // 获取redis 存储 路径 [redis]中存储的格式 /registry/服务名称/服务id
 func (r *RedisDiscovery) getRedisPath(serName string, id string) string {
 	return fmt.Sprintf("/registry/%s/%s", serName, id)
+}
+
+func (r *RedisDiscovery) Add(load int64) {
+	atomic.AddInt64(&r.ser.CurrentLoad, load)
+}
+func (r *RedisDiscovery) Less(load int64) {
+	atomic.AddInt64(&r.ser.CurrentLoad, -load)
+}
+
+func (r *RedisDiscovery) Limit() bool {
+	if r.ser.MaximumLoad == 0 {
+		return false
+	}
+
+	if atomic.LoadInt64(&r.ser.CurrentLoad) >= r.ser.MaximumLoad {
+		return true
+	}
+
+	return false
 }

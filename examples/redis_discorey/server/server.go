@@ -20,7 +20,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if err := ser.Run(server.UseTCP("0.0.0.0:8074"), server.Trace(), server.SetDiscovery(redisDiscovery, "127.0.0.1:8074", 10)); err != nil {
+	if err := ser.Run(server.UseTCP("0.0.0.0:8074"), server.Trace(), server.SetDiscovery(redisDiscovery, "127.0.0.1:8074", 10, 10000)); err != nil {
 		log.Fatalln(err)
 	}
 }

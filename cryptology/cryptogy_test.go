@@ -40,7 +40,6 @@ func TestRSA(t *testing.T) {
 	fmt.Println(RsaVerySignWithSha256([]byte(data1), sha256, pubKey))
 
 	// 加密
-
 	encrypt, _ := RsaEncrypt([]byte(data1), pubKey)
 	fmt.Println("en: ", encrypt, "  ", len(encrypt), "  org: ", len([]byte(data1)))
 

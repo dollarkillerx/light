@@ -1,7 +1,6 @@
 package client
 
 import (
-	"log"
 	"runtime"
 	"time"
 
@@ -19,7 +18,7 @@ type Options struct {
 
 	pool         int
 	cryptology   cryptology.Cryptology
-	aesKey       []byte
+	rsaPublicKey []byte
 	writeTimeout time.Duration
 	readTimeout  time.Duration
 	heartBeat    time.Duration
@@ -32,18 +31,25 @@ func defaultOptions() *Options {
 	if defaultPoolSize < 20 {
 		defaultPoolSize = 20
 	}
+
 	return &Options{
 		pool:              defaultPoolSize,
 		serializationType: codes.MsgPack,
-		compressorType:    codes.GZIP,
+		compressorType:    codes.Snappy,
 		loadBalancing:     load_banlancing.NewPolling(),
 		cryptology:        cryptology.AES,
-		aesKey:            []byte("58a95a8f804b49e686f651a0d3f6e631"),
-		writeTimeout:      time.Minute,
-		readTimeout:       time.Minute * 3,
-		heartBeat:         time.Minute,
-		Trace:             false,
-		AUTH:              "",
+		rsaPublicKey: []byte(`
+-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDWviNW8C1f+cjy8KF0qT93AA1q
+lbQTXPKO4qm34bf6UnSpXgemm1zTEgcPu5Ifka2GgTEgeUMD//iwxr3BTNYA0ARc
+soVSN53vklXJqRL3xMWNUFg/2bsAZn5Irlw1xRZfzFzqyCDk5JvUCejvHjvjQwOH
+YGHsCfV0pvxPlwFq4wIDAQAB
+-----END PUBLIC KEY-----`),
+		writeTimeout: time.Minute,
+		readTimeout:  time.Minute * 3,
+		heartBeat:    time.Minute,
+		Trace:        false,
+		AUTH:         "",
 	}
 }
 
@@ -65,14 +71,10 @@ func SetLoadBalancing(lb load_banlancing.LoadBalancing) Option {
 	}
 }
 
-func SetAESCryptology(key []byte) Option {
-	if len(key) != 32 && len(key) != 16 {
-		log.Fatalln("AES KEY LEN == 32 OR == 16")
-	}
-
+func SetRASPublicKey(key []byte) Option {
 	return func(options *Options) {
 		options.cryptology = cryptology.AES
-		options.aesKey = key
+		options.rsaPublicKey = key
 	}
 }
 

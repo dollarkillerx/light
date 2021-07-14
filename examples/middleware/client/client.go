@@ -19,7 +19,7 @@ type MethodTestResp struct {
 }
 
 func main() {
-	client := client.NewClient(discovery.NewSimplePeerToPeer("127.0.0.1:8074", transport.TCP), client.SetAESCryptology([]byte("58a95a8f804b49e686f651a0d3f6e631")))
+	client := client.NewClient(discovery.NewSimplePeerToPeer("127.0.0.1:8074", transport.TCP))
 	connect, err := client.NewConnect("helloworld")
 	if err != nil {
 		log.Fatalln(err)

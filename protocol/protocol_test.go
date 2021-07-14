@@ -1,8 +1,11 @@
 package protocol
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/google/uuid"
 	"log"
+	"strings"
 	"testing"
 
 	"github.com/dollarkillerx/light/codes"
@@ -66,4 +69,21 @@ func TestProtocol(t *testing.T) {
 
 	fmt.Println(decodeMessage.ServiceName)
 	fmt.Println(decodeMessage.ServiceMethod)
+}
+
+func TestHandshake(t *testing.T) {
+	handshake := EncodeHandshake([]byte("asdasdasd"), []byte("asdegefssx"), []byte("xsxs"))
+
+	reader := bytes.NewReader(handshake)
+	rc := &Handshake{}
+	err := rc.Handshake(reader)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	fmt.Println(string(rc.Token))
+	fmt.Println(string(rc.Key))
+	fmt.Println(string(rc.Error))
+
+	rb := []byte(strings.ReplaceAll(uuid.New().String(), "-", ""))
+	fmt.Println(len(rb))
 }
