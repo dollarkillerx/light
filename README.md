@@ -1,6 +1,8 @@
 # light
 LightRPC Multi-protocol encryption RPC
 
+![](./README/light_rpc.svg)
+
 ### Multi-protocol
 - [x] TCP
 - [x] KCP

@@ -391,9 +391,14 @@ func (b *BaseClient) processMessage() (magic string, respChan chan error, err er
 	msg, err := proto.IODecode(b.conn)
 	if err != nil {
 		if err == io.EOF {
-			er := b.reconnection()
-			if er != nil {
-				log.Println("Reconnection Error: ", er)
+			for {
+				er := b.reconnection()
+				if er != nil {
+					log.Println("Reconnection Error: ", er)
+					time.Sleep(time.Second)
+				} else {
+					return
+				}
 			}
 		}
 		return "", nil, err
