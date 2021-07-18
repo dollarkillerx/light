@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/dollarkillerx/light"
@@ -37,5 +36,4 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	fmt.Println(resp)
 }

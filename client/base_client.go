@@ -2,7 +2,6 @@ package client
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"strings"
@@ -18,7 +17,6 @@ import (
 	"github.com/dollarkillerx/light/utils"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"go.uber.org/atomic"
 )
 
 var compressorMin = 10 << 20 // > 10M
@@ -36,10 +34,9 @@ type BaseClient struct {
 	respInterMap map[string]*respMessage
 	respInterRM  sync.RWMutex
 	writeMu      sync.Mutex
-	// heartBeat
-	heartBeatMark atomic.Bool
-	// processMessageManager
-	processMessageMark atomic.Bool
+
+	err   error
+	close chan struct{}
 }
 
 type respMessage struct {
@@ -76,6 +73,7 @@ func newBaseClient(serverName string, options *Options) (*BaseClient, error) {
 
 	aesKey := []byte(strings.ReplaceAll(uuid.New().String(), "-", ""))
 
+	// 交换秘钥
 	aesKey2, err := cryptology.RsaEncrypt(aesKey, options.rsaPublicKey)
 	if err != nil {
 		return nil, err
@@ -100,80 +98,20 @@ func newBaseClient(serverName string, options *Options) (*BaseClient, error) {
 	}
 
 	bc := &BaseClient{
-		serverName:         serverName,
-		conn:               con,
-		options:            options,
-		serialization:      serialization,
-		compressor:         compressor,
-		respInterMap:       map[string]*respMessage{},
-		heartBeatMark:      atomic.Bool{},
-		processMessageMark: atomic.Bool{},
-		aesKey:             aesKey,
+		serverName:    serverName,
+		conn:          con,
+		options:       options,
+		serialization: serialization,
+		compressor:    compressor,
+		respInterMap:  map[string]*respMessage{},
+		aesKey:        aesKey,
+		close:         make(chan struct{}),
 	}
 
 	go bc.heartBeat()
 	go bc.processMessageManager()
 
 	return bc, nil
-}
-
-// reconnection broken pipe or EOF
-func (b *BaseClient) reconnection() error {
-	discovery, err := b.options.Discovery.Discovery(b.serverName)
-	if err != nil {
-		return err
-	}
-
-	b.options.loadBalancing.InitBalancing(discovery)
-	service, err := b.options.loadBalancing.GetService()
-	if err != nil {
-		return err
-	}
-	con, err := transport.Client.Gen(service.Protocol, service.Addr)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	b.writeMu.Lock()
-	defer b.writeMu.Unlock()
-	b.conn.Close() // 回收
-
-	b.conn = con
-
-	encrypt, err := cryptology.RsaEncrypt([]byte(b.options.AUTH), b.options.rsaPublicKey)
-	if err != nil {
-		return err
-	}
-
-	aesKey := []byte(strings.ReplaceAll(uuid.New().String(), "-", ""))
-
-	aesKey2, err := cryptology.RsaEncrypt(aesKey, b.options.rsaPublicKey)
-	if err != nil {
-		return err
-	}
-	handshake := protocol.EncodeHandshake(aesKey2, encrypt, []byte(""))
-	_, err = con.Write(handshake)
-	if err != nil {
-		con.Close()
-		return err
-	}
-
-	hsk := &protocol.Handshake{}
-	err = hsk.Handshake(con)
-	if err != nil {
-		con.Close()
-		return err
-	}
-	if hsk.Error != nil && len(hsk.Error) > 0 {
-		con.Close()
-		err := string(hsk.Error)
-		return errors.New(err)
-	}
-
-	go b.heartBeat()
-	go b.processMessageManager()
-	fmt.Println("Reconnection SUCCESS")
-	return nil
 }
 
 func (b *BaseClient) Call(ctx *light.Context, serviceMethod string, request interface{}, response interface{}) (err error) {
@@ -220,6 +158,8 @@ func (b *BaseClient) Call(ctx *light.Context, serviceMethod string, request inte
 		return errors.WithStack(err)
 	case <-time.After(timeout):
 		return errors.WithStack(pkg.ErrTimeout)
+	case <-b.close:
+		return errors.New("net close")
 	}
 }
 
@@ -302,16 +242,7 @@ func (b *BaseClient) call(ctx *light.Context, serviceMethod string, request inte
 		if b.options.Trace {
 			log.Println(err)
 		}
-		//if strings.Contains(err.Error(), "broken pipe") || strings.Contains(err.Error(), "network") {
-		//	er := b.reconnection()
-		//	if er != nil {
-		//		log.Println("Reconnection Error: ", er)
-		//	}
-		//}
-		er := b.reconnection()
-		if er != nil {
-			log.Println("Reconnection Error: ", er)
-		}
+		b.err = err
 		return "", errors.WithStack(err)
 	}
 
@@ -319,45 +250,40 @@ func (b *BaseClient) call(ctx *light.Context, serviceMethod string, request inte
 }
 
 func (b *BaseClient) heartBeat() {
-	if b.heartBeatMark.Load() {
-		return
-	}
-	b.heartBeatMark.Swap(true)
 	defer func() {
-		b.heartBeatMark.Swap(false)
+		fmt.Println("heartBeat Close")
 	}()
+
+loop:
 	for {
-		_, i, err := protocol.EncodeMessage("x", []byte(""), []byte(""), []byte(""), byte(protocol.HeartBeat), byte(b.options.compressorType), byte(b.options.serializationType), []byte(""))
-		if err != nil {
-			log.Println(err)
-			break
-		}
-		now := time.Now()
-		b.conn.SetDeadline(now.Add(b.options.writeTimeout))
-		b.conn.SetWriteDeadline(now.Add(b.options.writeTimeout))
-		b.writeMu.Lock()
-		_, err = b.conn.Write(i)
-		b.writeMu.Unlock()
-		if err != nil {
-			err := b.reconnection()
+		select {
+		case <-b.close:
+			break loop
+		case <-time.After(b.options.heartBeat):
+			_, i, err := protocol.EncodeMessage("x", []byte(""), []byte(""), []byte(""), byte(protocol.HeartBeat), byte(b.options.compressorType), byte(b.options.serializationType), []byte(""))
 			if err != nil {
 				log.Println(err)
-				return
+				break
 			}
-			break
+			now := time.Now()
+			b.conn.SetDeadline(now.Add(b.options.writeTimeout))
+			b.conn.SetWriteDeadline(now.Add(b.options.writeTimeout))
+			b.writeMu.Lock()
+			_, err = b.conn.Write(i)
+			b.writeMu.Unlock()
+			if err != nil {
+				b.err = err
+				break loop
+			}
 		}
-		time.Sleep(b.options.heartBeat)
 	}
 }
 
 func (b *BaseClient) processMessageManager() {
-	if b.processMessageMark.Load() {
-		return
-	}
-	b.processMessageMark.Swap(true)
 	defer func() {
-		b.processMessageMark.Swap(false)
+		fmt.Println("processMessageManager Close")
 	}()
+
 	for {
 		magic, respChan, err := b.processMessage()
 		if err == nil && magic == "" {
@@ -365,10 +291,6 @@ func (b *BaseClient) processMessageManager() {
 		}
 
 		if err != nil && magic == "" {
-			if err != io.EOF {
-				log.Println(err)
-			}
-			// 重zhi
 			break
 		}
 
@@ -390,17 +312,8 @@ func (b *BaseClient) processMessage() (magic string, respChan chan error, err er
 	proto := protocol.NewProtocol()
 	msg, err := proto.IODecode(b.conn)
 	if err != nil {
-		if err == io.EOF {
-			for {
-				er := b.reconnection()
-				if er != nil {
-					log.Println("Reconnection Error: ", er)
-					time.Sleep(time.Second)
-				} else {
-					return
-				}
-			}
-		}
+		b.err = err
+		close(b.close)
 		return "", nil, err
 	}
 
@@ -467,4 +380,8 @@ func (b *BaseClient) processMessage() (magic string, respChan chan error, err er
 	}
 
 	return msg.MagicNumber, message.respChan, b.serialization.Decode(msg.Payload, message.response)
+}
+
+func (b *BaseClient) Error() error {
+	return b.err
 }

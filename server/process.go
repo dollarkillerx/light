@@ -104,6 +104,7 @@ func (s *Server) process(conn net.Conn) {
 		// 熔断
 		encodeHandshake := protocol.EncodeHandshake([]byte(""), []byte(""), []byte(pkg.ErrCircuitBreaker.Error()))
 		conn.Write(encodeHandshake)
+		log.Println(s.options.Discovery.Limit())
 		return
 	}
 
@@ -228,6 +229,7 @@ func (s *Server) processResponse(xChannel *utils.XChannel, msg *protocol.Message
 			return
 		}
 
+		log.Println(s.options.Discovery.Limit())
 		log.Println("限流/////////////")
 
 		return

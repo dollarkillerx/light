@@ -165,10 +165,22 @@ func (r *RedisDiscovery) Less(load int64) {
 	atomic.AddInt64(&r.ser.CurrentLoad, -load)
 }
 
+var sn sync.Once
+
 func (r *RedisDiscovery) Limit() bool {
 	if r.ser.MaximumLoad == 0 {
 		return false
 	}
+
+	sn.Do(func() {
+		go func() {
+			for {
+				fmt.Println("load: ", atomic.LoadInt64(&r.ser.CurrentLoad))
+				fmt.Println("r: ", r.ser.MaximumLoad)
+				time.Sleep(time.Second)
+			}
+		}()
+	})
 
 	if atomic.LoadInt64(&r.ser.CurrentLoad) >= r.ser.MaximumLoad {
 		return true

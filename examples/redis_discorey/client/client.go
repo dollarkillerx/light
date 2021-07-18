@@ -1,12 +1,11 @@
 package main
 
 import (
-	"log"
-	"time"
-
 	"github.com/dollarkillerx/light"
 	"github.com/dollarkillerx/light/client"
 	"github.com/dollarkillerx/light/discovery"
+
+	"log"
 )
 
 type MethodTestReq struct {
@@ -32,28 +31,15 @@ func main() {
 		return
 	}
 
-	li := make(chan struct{}, 1)
-	for {
-		li <- struct{}{}
-		go func() {
-			defer func() {
-				<-li
-			}()
-
-			req := MethodTestReq{
-				Name: "hello",
-			}
-			resp := MethodTestResp{}
-			err = connect.Call(light.DefaultCtx(), "HelloWorld", &req, &resp)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-
-			log.Println(resp)
-		}()
-
-		time.Sleep(time.Millisecond * 10)
+	req := MethodTestReq{
+		Name: "hello",
+	}
+	resp := MethodTestResp{}
+	err = connect.Call(light.DefaultCtx(), "HelloWorld", &req, &resp)
+	if err != nil {
+		log.Println(err)
+		return
 	}
 
+	log.Println(resp)
 }

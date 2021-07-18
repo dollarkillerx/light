@@ -2,13 +2,11 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/dollarkillerx/light"
 	"github.com/dollarkillerx/light/discovery"
 	"github.com/pkg/errors"
-	"github.com/rs/xid"
 )
 
 type Client struct {
@@ -50,14 +48,11 @@ func (c *Client) NewConnect(serverName string) (conn *Connect, err error) {
 func (c *Connect) Call(ctx *light.Context, serviceMethod string, request interface{}, response interface{}) error {
 	ctxT, _ := context.WithTimeout(context.TODO(), time.Second*6)
 	var err error
-	xid := xid.New().String()
 	client, err := c.pool.Get(ctxT)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	fmt.Println("Get: ", xid)
 	defer func() {
-		fmt.Println("Put: ", xid)
 		c.pool.Put(client)
 	}()
 
