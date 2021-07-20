@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
+	"log"
+
 	"github.com/dollarkillerx/light"
 	"github.com/dollarkillerx/light/client"
 	"github.com/dollarkillerx/light/discovery"
 	"github.com/dollarkillerx/light/transport"
-	"log"
 )
 
 type MethodTestReq struct {
@@ -35,4 +37,5 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	fmt.Println(resp)
 }

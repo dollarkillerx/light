@@ -109,18 +109,18 @@ func DecodeHeader(data []byte) (*Header, error) {
 	var header Header
 	header.St = data[0]
 	header.Version = data[1]
-	header.Crc32 = binary.LittleEndian.Uint32(data[2:6])
+	header.Crc32 = binary.BigEndian.Uint32(data[2:6])
 	if Crc32 {
 		u := crc32.ChecksumIEEE(data[6:])
 		if header.Crc32 != u {
 			return nil, errors.New("CRC Calibration")
 		}
 	}
-	header.MagicNumberSize = binary.LittleEndian.Uint32(data[6:10])
-	header.ServerNameSize = binary.LittleEndian.Uint32(data[10:14])
-	header.ServerMethodSize = binary.LittleEndian.Uint32(data[14:18])
-	header.MetaDataSize = binary.LittleEndian.Uint32(data[18:22])
-	header.PayloadSize = binary.LittleEndian.Uint32(data[22:26])
+	header.MagicNumberSize = binary.BigEndian.Uint32(data[6:10])
+	header.ServerNameSize = binary.BigEndian.Uint32(data[10:14])
+	header.ServerMethodSize = binary.BigEndian.Uint32(data[14:18])
+	header.MetaDataSize = binary.BigEndian.Uint32(data[18:22])
+	header.PayloadSize = binary.BigEndian.Uint32(data[22:26])
 	header.RespType = data[26]
 	header.CompressorType = data[27]
 	header.SerializationType = data[28]
@@ -190,11 +190,11 @@ func EncodeMessage(magicStr string, server, method, metaData []byte, respType, c
 
 	buf[0] = LightSt
 	buf[1] = byte(V1)
-	binary.LittleEndian.PutUint32(buf[6:10], uint32(len(magicNumber)))
-	binary.LittleEndian.PutUint32(buf[10:14], uint32(len(server)))
-	binary.LittleEndian.PutUint32(buf[14:18], uint32(len(method)))
-	binary.LittleEndian.PutUint32(buf[18:22], uint32(len(metaData)))
-	binary.LittleEndian.PutUint32(buf[22:26], uint32(len(payload)))
+	binary.BigEndian.PutUint32(buf[6:10], uint32(len(magicNumber)))
+	binary.BigEndian.PutUint32(buf[10:14], uint32(len(server)))
+	binary.BigEndian.PutUint32(buf[14:18], uint32(len(method)))
+	binary.BigEndian.PutUint32(buf[18:22], uint32(len(metaData)))
+	binary.BigEndian.PutUint32(buf[22:26], uint32(len(payload)))
 	buf[26] = respType
 	buf[27] = compressorType
 	buf[28] = serializationType
@@ -221,7 +221,7 @@ func EncodeMessage(magicStr string, server, method, metaData []byte, respType, c
 
 	if Crc32 {
 		u := crc32.ChecksumIEEE(buf[6:])
-		binary.LittleEndian.PutUint32(buf[2:6], u)
+		binary.BigEndian.PutUint32(buf[2:6], u)
 	}
 
 	return string(magicNumber), buf, nil
@@ -246,9 +246,9 @@ func EncodeHandshake(key, token, err []byte) []byte {
 	buf := make([]byte, 13+len(key)+len(token)+len(err))
 
 	buf[0] = LightHandshakeSt
-	binary.LittleEndian.PutUint32(buf[1:5], uint32(len(key)))
-	binary.LittleEndian.PutUint32(buf[5:9], uint32(len(token)))
-	binary.LittleEndian.PutUint32(buf[9:13], uint32(len(err)))
+	binary.BigEndian.PutUint32(buf[1:5], uint32(len(key)))
+	binary.BigEndian.PutUint32(buf[5:9], uint32(len(token)))
+	binary.BigEndian.PutUint32(buf[9:13], uint32(len(err)))
 
 	st := 13
 	endI := st + len(key)
@@ -286,9 +286,9 @@ func (h *Handshake) Handshake(r io.Reader) error {
 	}
 
 	// 解析头
-	keySize := binary.LittleEndian.Uint32(headerByte[1:5])
-	tokenSize := binary.LittleEndian.Uint32(headerByte[5:9])
-	errorSize := binary.LittleEndian.Uint32(headerByte[9:13])
+	keySize := binary.BigEndian.Uint32(headerByte[1:5])
+	tokenSize := binary.BigEndian.Uint32(headerByte[5:9])
+	errorSize := binary.BigEndian.Uint32(headerByte[9:13])
 
 	bodyData := make([]byte, keySize+tokenSize+errorSize)
 	_, err = io.ReadFull(r, bodyData)
